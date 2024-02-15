@@ -1,9 +1,19 @@
-﻿using System.Runtime.CompilerServices;
+﻿using MySql.Data.MySqlClient;
+using System.Diagnostics.CodeAnalysis;
 
 namespace ComputerTNB_ClassMgr_Bot
 {
     internal class Program
     {
+        #region Program_Variables
+
+        /// <summary>
+        /// DB Manager object for manipulating MySQL database.
+        /// </summary>
+        public static DBMgr db;
+
+        #endregion
+
         private static void PrintWelcomeMessage()
         {
             Console.WriteLine(
@@ -48,7 +58,28 @@ namespace ComputerTNB_ClassMgr_Bot
             // Clear console screen.
             Console.Clear();
 
+            // Create DBMgr object.
+            try
+            {
+                db = new DBMgr(
+                mySql_ServerName, mySql_DatabaseName, mySql_Username, mySql_Password
+                );
 
+                // Test connection.
+                db.DBMS_TestConnection();
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"ERROR Initializing MySQL DBMS Connection:\n{ex.Message}\n\nPress ENTER to exit...");
+                Console.ReadLine();
+                return -1;
+            }
+
+            // Get bot token.
+            string? botToken =
+                Print_RequestPromptLine("Enter BOT CLIENT SECRET TOKEN:\t");
+            if (string.IsNullOrEmpty(botToken))
+                return 0;
 
             // Exit application successfully.
             return 0;

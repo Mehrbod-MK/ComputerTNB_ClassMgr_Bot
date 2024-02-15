@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using MySql.Data.MySqlClient;
+
 namespace ComputerTNB_ClassMgr_Bot
 {
     /// <summary>
@@ -19,6 +21,8 @@ namespace ComputerTNB_ClassMgr_Bot
         private string password;
 
         private string connectionString;
+
+        private MySqlConnection sql_Connection;
 
         #endregion
 
@@ -70,6 +74,24 @@ namespace ComputerTNB_ClassMgr_Bot
             // Generate connection string.
             connectionString = 
                 $"SERVER={server};DATABASE={database};UID={username};PASSWORD={password};";
+
+            // Create MySQL Connection object.
+            this.sql_Connection = new MySqlConnection(this.connectionString);
+        }
+
+        public void DBMS_TestConnection()
+        {
+            this.sql_Connection.Open();      
+            this.sql_Connection.Close();
+        }
+
+        /// <summary>
+        /// Asynchronously opens and closes connection for testing.
+        /// </summary>
+        public async Task DBMS_TestConnectionAsync()
+        {
+            await this.sql_Connection.OpenAsync().ConfigureAwait(false);
+            await this.sql_Connection.CloseAsync().ConfigureAwait(false);
         }
     }
 }
