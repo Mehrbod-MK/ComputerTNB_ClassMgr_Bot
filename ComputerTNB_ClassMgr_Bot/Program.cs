@@ -34,7 +34,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 mySql_ServerName = @"localhost";
             string? mySql_DatabaseName =
                 Print_RequestPromptLine("Enter MySQL Database name:\t");
-            if (string.IsNullOrEmpty(mySql_ServerName))
+            if (string.IsNullOrEmpty(mySql_DatabaseName))
                 return 0;
             string? mySql_Username =
                 Print_RequestPromptLine("Enter MySQL Username:\t");
@@ -44,6 +44,11 @@ namespace ComputerTNB_ClassMgr_Bot
                 Print_RequestPromptLine("Enter MySQL Password:\t");
             if (string.IsNullOrEmpty(mySql_Password))
                 return 0;
+
+            // Clear console screen.
+            Console.Clear();
+
+
 
             // Exit application successfully.
             return 0;
