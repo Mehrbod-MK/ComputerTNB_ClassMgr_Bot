@@ -12,6 +12,11 @@ namespace ComputerTNB_ClassMgr_Bot
         /// </summary>
         public static DBMgr db;
 
+        /// <summary>
+        /// Bot object for communicating with Telegram cloud.
+        /// </summary>
+        public static Bot bot;
+
         #endregion
 
         private static void PrintWelcomeMessage()
@@ -80,6 +85,15 @@ namespace ComputerTNB_ClassMgr_Bot
                 Print_RequestPromptLine("Enter BOT CLIENT SECRET TOKEN:\t");
             if (string.IsNullOrEmpty(botToken))
                 return 0;
+
+            // Establish a connection to global Telegram cloud.
+            bot = new Bot(botToken);
+            var me = bot.Bot_EstablishConnectionAsync().Result;
+            if (me == null)
+            {
+                Console.ReadLine();
+                return -2;
+            }
 
             // Exit application successfully.
             return 0;

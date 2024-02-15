@@ -26,6 +26,19 @@ namespace ComputerTNB_ClassMgr_Bot
 
         #endregion
 
+        #region DBMgr_Enums
+
+        public enum Roles
+        {
+            Unknown,
+
+            Student,
+            Teacher,
+            Admin,
+        }
+
+        #endregion
+
         #region DBMgr_Properties
 
         public string ServerName
@@ -74,15 +87,15 @@ namespace ComputerTNB_ClassMgr_Bot
             // Generate connection string.
             connectionString = 
                 $"SERVER={server};DATABASE={database};UID={username};PASSWORD={password};";
-
-            // Create MySQL Connection object.
-            this.sql_Connection = new MySqlConnection(this.connectionString);
         }
 
         public void DBMS_TestConnection()
         {
-            this.sql_Connection.Open();      
-            this.sql_Connection.Close();
+            using(var connection = new MySqlConnection(connectionString))
+            {
+                this.sql_Connection.Open();
+                this.sql_Connection.Close();
+            }
         }
 
         /// <summary>
@@ -92,6 +105,30 @@ namespace ComputerTNB_ClassMgr_Bot
         {
             await this.sql_Connection.OpenAsync().ConfigureAwait(false);
             await this.sql_Connection.CloseAsync().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="chatID"></param>
+        /// <returns></returns>
+        public async Task<Models.Student?> SQL_GetStudent(long chatID)
+        {
+            try
+            {
+                MySqlConnection x;
+                using(var connection = new MySqlConnection(connectionString))
+                {
+                    string command = $"SELECT * FROM students," +
+                        $"WHERE ChatID = {chatID}";
+
+                    
+                }
+            }
+            catch(Exception ex)
+            {
+
+            }
         }
     }
 }

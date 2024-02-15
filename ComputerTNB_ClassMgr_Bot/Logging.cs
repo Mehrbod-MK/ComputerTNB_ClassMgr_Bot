@@ -47,5 +47,45 @@ namespace ComputerTNB_ClassMgr_Bot
             else
                 Console.Write(msg);
         }
+
+        public static void Log_Warning(string msg,
+            string? callingMethod = null,
+            bool carriageReturn = true, bool includDate = true)
+        {
+            if (includDate)
+                Console.Write($"[{DateTime.Now}]\t");
+
+            if (!string.IsNullOrEmpty(callingMethod))
+                Console.Write($"WARNING at {callingMethod}:\t");
+            else
+                Console.Write("WARNING:\t");
+
+            if (carriageReturn)
+                Console.WriteLine(msg);
+            else
+                Console.Write(msg);
+        }
+
+        public static void Log_Warning_OnCondition(bool condition,
+            string msg,
+            string? callingMethod = null,
+            bool carriageReturn = true, bool includDate = true)
+        {
+            if (!condition)
+                return;
+
+            if (includDate)
+                Console.Write($"[{DateTime.Now}]\t");
+
+            if (!string.IsNullOrEmpty(callingMethod))
+                Console.Write($"WARNING at {callingMethod}:\t");
+            else
+                Console.Write("WARNING:\t");
+
+            if (carriageReturn)
+                Console.WriteLine(msg);
+            else
+                Console.Write(msg);
+        }
     }
 }
