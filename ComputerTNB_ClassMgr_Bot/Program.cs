@@ -97,7 +97,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
             // Main program loop.
             CancellationTokenSource cts = new CancellationTokenSource();
-            var botTask = Task.Run(async () => { await bot.Bot_PollLoopAsync(cts); });
+            var botTask = Task.Run(async () => { await bot.Bot_PollLoopAsync(cts); }, cts.Token);
             while(true)
             {
                 var key = Console.ReadKey();

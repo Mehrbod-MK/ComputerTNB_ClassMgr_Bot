@@ -7,20 +7,19 @@ using System.Threading.Tasks;
 namespace ComputerTNB_ClassMgr_Bot.Models
 {
     /// <summary>
-    /// Model class for a Student in database.
+    /// Model class for a Teacher database object.
     /// </summary>
-    public class Student
+    public class Teacher
     {
-        #region Student_Variables
+        #region Teacher_Variables
 
         public long chatID = 0;
         public string? phoneNumber = null;
         public string? email = null;
         public DateTime joinedDate = DateTime.MinValue;
         public DateTime lastActivity = DateTime.MinValue;
-        public string? studentId = null;
-        public string? firstName = null;
-        public string? lastName = null;
+        public string nationalID = string.Empty;
+        public string fullName = string.Empty;
 
         public uint state = 0;
 

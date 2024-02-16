@@ -125,7 +125,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
         public async Task Process_Message_Async(Message message)
         {
-            var callDB = await Program.db.SQL_GetStudent(message.Chat.Id);
+            // Check role of user.
 
             
         }
