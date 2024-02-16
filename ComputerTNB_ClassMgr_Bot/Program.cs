@@ -95,6 +95,18 @@ namespace ComputerTNB_ClassMgr_Bot
                 return -2;
             }
 
+            // Main program loop.
+            var botTask = Task.Run(async () => { await bot.Bot_PollLoopAsync(); });
+            while(true)
+            {
+                var key = Console.ReadKey();
+                if(key.Key == ConsoleKey.Escape)
+                {
+                    botTask.Dispose();
+                    break;
+                }
+            }
+
             // Exit application successfully.
             return 0;
         }

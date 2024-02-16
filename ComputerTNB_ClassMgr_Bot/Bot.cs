@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ComputerTNB_ClassMgr_Bot.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -104,16 +105,24 @@ namespace ComputerTNB_ClassMgr_Bot
                                 break;
 
                             case Telegram.Bot.Types.Enums.UpdateType.Message:
-
+                                if (update.Message != null)
+                                    await Process_Message_Async(update.Message);
                                 break;
                         }
                     }
                 }
                 catch(Exception ex)
                 {
-
+                    
                 }
             }
+        }
+
+        public async Task Process_Message_Async(Message message)
+        {
+            var callDB = await Program.db.SQL_GetStudent(message.Chat.Id);
+
+            
         }
 
         #endregion
