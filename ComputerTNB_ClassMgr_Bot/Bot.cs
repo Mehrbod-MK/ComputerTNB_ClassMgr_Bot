@@ -71,7 +71,7 @@ namespace ComputerTNB_ClassMgr_Bot
         /// Main task for polling updates from cloud.
         /// </summary>
         /// <returns>This task is in loop and returns nothing.</returns>
-        public async Task Bot_PollLoopAsync()
+        public async Task Bot_PollLoopAsync(CancellationTokenSource? ct = null)
         {
             int updateOffset = 0;
 
@@ -86,6 +86,11 @@ namespace ComputerTNB_ClassMgr_Bot
 
             while(true)
             {
+                // Check cancellation event.
+                if (ct != null)
+                    if (ct.IsCancellationRequested)
+                        break;
+
                 try
                 {
                     var updates = await botClient.GetUpdatesAsync(updateOffset, null, 3);

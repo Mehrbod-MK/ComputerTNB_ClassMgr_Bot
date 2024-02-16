@@ -96,13 +96,14 @@ namespace ComputerTNB_ClassMgr_Bot
             }
 
             // Main program loop.
-            var botTask = Task.Run(async () => { await bot.Bot_PollLoopAsync(); });
+            CancellationTokenSource cts = new CancellationTokenSource();
+            var botTask = Task.Run(async () => { await bot.Bot_PollLoopAsync(cts); });
             while(true)
             {
                 var key = Console.ReadKey();
                 if(key.Key == ConsoleKey.Escape)
                 {
-                    botTask.Dispose();
+                    cts.Cancel(false);
                     break;
                 }
             }
