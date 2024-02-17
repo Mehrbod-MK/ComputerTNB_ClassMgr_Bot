@@ -204,7 +204,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 );
 
             // Log.
-            Logging.Log_Information($"Welcomed new user, {message.Chat.Id}");
+            Logging.Log_Information($"Welcomed new user, {message.Chat.Id}", message.Chat.Id);
         }
 
         #endregion
