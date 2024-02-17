@@ -54,17 +54,6 @@ namespace ComputerTNB_ClassMgr_Bot
 
         #endregion
 
-        public enum Roles
-        {
-            Unknown,
-
-            Student,
-            Teacher,
-            Admin,
-        }
-
-        #endregion
-
         #region DBMgr_Generics
 
         public static T? ConvertFromDBVal<T>(object obj)
@@ -331,9 +320,26 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
-        public async Task<DBResult> SQL_GetUserRole(long chatID)
+        /// <summary>
+        /// Gets the role of user, providing its ChatID.
+        /// </summary>
+        /// <param name="chatID">Primary Key: ChatID.</param>
+        /// <returns>This task returns a role enumeration.</returns>
+        public async Task<User_Roles> SQL_GetUserRole(long chatID)
         {
+            var db_Result = await SQL_GetAdmin(chatID);
+            if (db_Result.result != null)
+                return ((Admin)db_Result.result).GetRole();
 
+            db_Result = await SQL_GetTeacher(chatID);
+            if (db_Result.result != null)
+                return ((Teacher)db_Result.result).GetRole();
+
+            db_Result = await SQL_GetStudent(chatID);
+            if (db_Result.result != null)
+                return ((Student)db_Result.result).GetRole();
+
+            return User_Roles.Unknown;
         }
     }
 }

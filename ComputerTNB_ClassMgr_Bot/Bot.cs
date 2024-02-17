@@ -1,4 +1,5 @@
 ﻿using ComputerTNB_ClassMgr_Bot.Models;
+using ComputerTNB_ClassMgr_Bot.Resources.Strings;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +17,12 @@ namespace ComputerTNB_ClassMgr_Bot
     /// </summary>
     public class Bot
     {
+        #region Bot_Constants
+
+        const string SYSTEM_ADMIN_ID = @"@MAD_Gametronics";
+
+        #endregion
+
         #region Bot_Variables
 
         private string botToken = "";
@@ -125,9 +132,51 @@ namespace ComputerTNB_ClassMgr_Bot
 
         public async Task Process_Message_Async(Message message)
         {
-            // Check role of user.
+            long chatID = message.Chat.Id;
 
-            
+            // Check role of user.
+            var role = await Program.db.SQL_GetUserRole(chatID);
+
+            // Process message based on user's role.
+            switch(role)
+            {
+                // User's role is unknown, probably new...
+                case DBMgr.User_Roles.Unknown:
+                    await Process_Message_Unknown_User_Async(message);
+                    break;
+            }
+        }
+
+        public async Task Process_Message_Unknown_User_Async(Message message)
+        {
+            if(botClient == null)
+            {
+                throw new NullReferenceException();
+            }
+
+            try
+            {
+                // Send registration message.
+                await botClient.SendTextMessageAsync(
+                    message.Chat.Id,
+
+                    "👋 سلام و درود ویژه خدمت شما کاربر گرامی بزرگوار\n" +
+                    "⭐ به سامانه مدیریت امور کلاسی گروه کامپیوتر تهران شمال خوش آمدید.\n\n" +
+                    $"⚠ <strong>شماره نشست کاربری فعال شما:</strong> <code>{message.Chat.Id}</code>\n\n" + 
+                    $"👈 این پیام را برای راهبر سیستم به آیدی <b>{SYSTEM_ADMIN_ID}</b> فوروارد (هدایت) کرده و سپس مشخصات ذیل را برای ایشان ارسال کنید تا ثبت نام شما در سیستم صورت گیرد:\n\n" +
+                    "1️⃣ سِمَت شما (دانشجو، استاد، ادمین)\n2️⃣نام و نام خانوادگی کامل\n3️⃣ شماره تماس منطبق با این نشست کاربری\n4️⃣ پست الکترونیکی (ایمیل)\n\n🙏 <i>سپاس از توجه شما.</i>",
+
+                    null,
+                    Telegram.Bot.Types.Enums.ParseMode.Html,
+                    null,
+                    null,
+                    false, false, message.MessageId, true, null
+                    );
+            }
+            catch(Exception ex)
+            {
+
+            }
         }
 
         #endregion

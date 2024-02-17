@@ -9,7 +9,7 @@ namespace ComputerTNB_ClassMgr_Bot.Models
     /// <summary>
     /// Model class for a Student in database.
     /// </summary>
-    public class Student
+    public class Student : IHasRole
     {
         #region Student_Variables
 
@@ -23,6 +23,13 @@ namespace ComputerTNB_ClassMgr_Bot.Models
         public string? lastName = null;
 
         public uint state = 0;
+
+        #endregion
+
+        #region Student_Implementations
+
+        public DBMgr.User_Roles GetRole() 
+            { return DBMgr.User_Roles.Student; }
 
         #endregion
     }

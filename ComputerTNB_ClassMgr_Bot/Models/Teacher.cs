@@ -24,5 +24,12 @@ namespace ComputerTNB_ClassMgr_Bot.Models
         public uint state = 0;
 
         #endregion
+
+        #region Teacher_Implementations
+
+        public DBMgr.User_Roles GetRole()
+        { return DBMgr.User_Roles.Teacher; }
+
+        #endregion
     }
 }
