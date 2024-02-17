@@ -242,6 +242,11 @@ namespace ComputerTNB_ClassMgr_Bot
             var teacher = (Teacher)teacherQuery.result;
 
             // UPDATE DATABASE VALUES.
+            var updateLastActivity_Query = await Program.db.SQL_ExecuteWrite(
+                "UPDATE teachers " +
+                $"SET LastActivity = \'{DBMgr.Convert_FromDateTime_ToSQLString(DateTime.Now)}\' " +
+                $"WHERE ChatID = \'{chatID}\'"
+                );
 
             ///////////////////////////// PROCESS TEXT MESSAGE /////////////////////////////
             if (message.Text != null)

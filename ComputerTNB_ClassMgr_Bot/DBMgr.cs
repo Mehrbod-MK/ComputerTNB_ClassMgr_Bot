@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
 using MySql.Data.MySqlClient;
+using ZstdSharp.Unsafe;
 
 namespace ComputerTNB_ClassMgr_Bot
 {
@@ -340,6 +341,90 @@ namespace ComputerTNB_ClassMgr_Bot
                 return ((Student)db_Result.result).GetRole();
 
             return User_Roles.Unknown;
+        }
+
+        /// <summary>
+        /// This task executes a WRITE command on MySql Database.
+        /// </summary>
+        /// <param name="command">The SQL command to execute.</param>
+        /// <returns>This task returns a database result structure.</returns>
+        public async Task<DBResult> SQL_ExecuteWrite(string command)
+        {
+            try
+            {
+                var rowsAffected = -1;
+
+                using(var connection = new MySqlConnection(ConnectionString))
+                {
+                    connection.ConfigureAwait(false);
+
+                    // Open SQL connection.
+                    connection.Open();
+
+                    // Create transaction.
+                    MySqlTransaction writeTransaction = await connection.BeginTransactionAsync();
+                    writeTransaction.ConfigureAwait(false);
+
+                    try
+                    {
+                        // Create command.
+                        MySqlCommand writeCmd = new MySqlCommand(command, connection, writeTransaction);
+                        writeCmd.ConfigureAwait(false);
+
+                        // Execute write command and dispose it.
+                        rowsAffected = await writeCmd.ExecuteNonQueryAsync();
+                        await writeCmd.DisposeAsync();
+
+                        // Commit transaction and dispose it.
+                        await writeTransaction.CommitAsync();
+                        await writeTransaction.DisposeAsync();
+
+                        return new DBResult()
+                        {
+                            success = true,
+                            exception = null,
+                            result = rowsAffected,
+                        };
+                    }
+                    catch(Exception)
+                    {
+                        try
+                        {
+                            // Roll back changes.
+                            await writeTransaction.RollbackAsync();
+
+                            return new DBResult()
+                            {
+                                success = false,
+                                exception = null,
+                                result = -1,
+                            };
+                        }
+                        catch(Exception)
+                        {
+                            // Throw fatal exception.
+                            throw;
+                        }
+                    }
+
+                }
+            }
+            catch(Exception ex)
+            {
+                return new DBResult()
+                {
+                    success = false,
+                    result = null,
+                    exception = ex,
+                };
+            }
+        }
+        
+        public static string Convert_FromDateTime_ToSQLString(DateTime dateTime)
+        {
+            return
+                $"{dateTime.Year:0000}-{dateTime.Month:00}-{dateTime.Day:00} " +
+                $"{dateTime.Hour}:{dateTime.Minute}:{dateTime.Second}";
         }
     }
 }
