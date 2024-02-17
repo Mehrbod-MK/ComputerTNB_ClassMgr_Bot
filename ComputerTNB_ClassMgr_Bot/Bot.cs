@@ -149,6 +149,11 @@ namespace ComputerTNB_ClassMgr_Bot
                     case DBMgr.User_Roles.Unknown:
                         await Process_Message_Unknown_User_Async(message);
                         break;
+
+                    // User is a teacher.
+                    case DBMgr.User_Roles.Teacher:
+                        
+                        break;
                 }
             }
             catch(Exception ex)
@@ -160,7 +165,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                     await botClient.SendTextMessageAsync(
                         message.Chat.Id,
-                        $"🚫 متأسفانه، خطای زیر در هنگام پردازش پیام ورودی به وقوع پیوست:\n\n❌<b>{ex.Message}</b>",
+                        $"🚫 متأسفانه، خطای زیر در هنگام پردازش پیام ورودی به وقوع پیوست:\n\n❌<b>{ex.Message}</b>\n\n👈 <i>لطفاً لحظاتی بعد تلاش نمایید یا اگر مشکل رفع نشد، با راهبر سیستم تماس حاصل فرمایید.</i>",
                         null,
                         Telegram.Bot.Types.Enums.ParseMode.Html,
                         null,
@@ -204,7 +209,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 );
 
             // Log.
-            Logging.Log_Information($"Welcomed new user, {message.Chat.Id}", message.Chat.Id);
+            Logging.Log_Information($"Welcomed new user, {message.Chat.Id}", message.Chat.Id.ToString());
         }
 
         #endregion
