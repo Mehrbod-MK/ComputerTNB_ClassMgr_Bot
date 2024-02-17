@@ -152,7 +152,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                     // User is a teacher.
                     case DBMgr.User_Roles.Teacher:
-                        
+                        await Process_Message_Teacher_User_Async(message);
                         break;
                 }
             }
@@ -165,7 +165,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                     await botClient.SendTextMessageAsync(
                         message.Chat.Id,
-                        $"🚫 متأسفانه، خطای زیر در هنگام پردازش پیام ورودی به وقوع پیوست:\n\n❌<b>{ex.Message}</b>\n\n👈 <i>لطفاً لحظاتی بعد تلاش نمایید یا اگر مشکل رفع نشد، با راهبر سیستم تماس حاصل فرمایید.</i>",
+                        $"🚫 متأسفانه، خطای زیر در هنگام پردازش پیام ورودی به وقوع پیوست:\n\n❌ <b>{ex.Message}</b>\n\n👈 <i>لطفاً لحظاتی بعد تلاش نمایید یا اگر مشکل رفع نشد، با راهبر سیستم تماس حاصل فرمایید.</i>",
                         null,
                         Telegram.Bot.Types.Enums.ParseMode.Html,
                         null,
@@ -186,6 +186,7 @@ namespace ComputerTNB_ClassMgr_Bot
         /// <exception cref="Telegram.Bot.Exceptions.ApiResponse"></exception>
         public async Task Process_Message_Unknown_User_Async(Message message)
         {
+            // Check BOT client.
             if(botClient == null)
             {
                 throw new NullReferenceException();
@@ -210,6 +211,49 @@ namespace ComputerTNB_ClassMgr_Bot
 
             // Log.
             Logging.Log_Information($"Welcomed new user, {message.Chat.Id}", message.Chat.Id.ToString());
+        }
+
+        /// <summary>
+        /// Processes an incoming Telegram Message JSON object for an unkown user.
+        /// </summary>
+        /// <param name="message">JSON message structure.</param>
+        /// <returns>This task returns nothing.</returns>
+        /// <exception cref="NullReferenceException"></exception>
+        /// <exception cref="Telegram.Bot.Exceptions.ApiResponse"></exception>
+        /// <exception cref="Exception">Other exceptions...</exception>
+        public async Task Process_Message_Teacher_User_Async(Message message)
+        {
+            // Check BOT client.
+            if (botClient == null)
+                throw new NullReferenceException();
+
+            var chatID = message.Chat.Id;
+            var teacherQuery = await Program.db.SQL_GetTeacher(chatID);
+
+            // Check for errors.
+            if (teacherQuery.success == false && teacherQuery.exception != null)
+                throw teacherQuery.exception;
+
+            // Check if query is NULL!
+            if (teacherQuery.result == null)
+                throw new InvalidDataException();
+
+            // Obtained teacher.
+            var teacher = (Teacher)teacherQuery.result;
+
+            // UPDATE DATABASE VALUES.
+
+            ///////////////////////////// PROCESS TEXT MESSAGE /////////////////////////////
+            if (message.Text != null)
+            {
+
+                switch(teacher.state)
+                {
+
+                }
+
+            }
+            ////////////////////////////////////////////////////////////////////////////////
         }
 
         #endregion
