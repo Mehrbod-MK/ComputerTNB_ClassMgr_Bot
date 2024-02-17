@@ -132,21 +132,53 @@ namespace ComputerTNB_ClassMgr_Bot
 
         public async Task Process_Message_Async(Message message)
         {
-            long chatID = message.Chat.Id;
+            if (botClient == null)
+                throw new NullReferenceException();
 
-            // Check role of user.
-            var role = await Program.db.SQL_GetUserRole(chatID);
-
-            // Process message based on user's role.
-            switch(role)
+            try
             {
-                // User's role is unknown, probably new...
-                case DBMgr.User_Roles.Unknown:
-                    await Process_Message_Unknown_User_Async(message);
-                    break;
+                long chatID = message.Chat.Id;
+
+                // Check role of user.
+                var role = await Program.db.SQL_GetUserRole(chatID);
+
+                // Process message based on user's role.
+                switch (role)
+                {
+                    // User's role is unknown, probably new...
+                    case DBMgr.User_Roles.Unknown:
+                        await Process_Message_Unknown_User_Async(message);
+                        break;
+                }
+            }
+            catch(Exception ex)
+            {
+                try
+                {
+                    // Log error.
+                    Logging.Log_Error(ex.Message, "Process_Message_Async()");
+
+                    await botClient.SendTextMessageAsync(
+                        message.Chat.Id,
+                        $"🚫 متأسفانه، خطای زیر در هنگام پردازش پیام ورودی به وقوع پیوست:\n\n❌<b>{ex.Message}</b>",
+                        null,
+                        Telegram.Bot.Types.Enums.ParseMode.Html,
+                        null,
+                        null,
+                        false, true, message.MessageId, true, null
+                        );
+                }
+                catch(Exception) { }
             }
         }
 
+        /// <summary>
+        /// Processes an incoming Telegram Message JSON object for an unkown user.
+        /// </summary>
+        /// <param name="message">JSON message structure.</param>
+        /// <returns>This task returns nothing.</returns>
+        /// <exception cref="NullReferenceException"></exception>
+        /// <exception cref="Telegram.Bot.Exceptions.ApiResponse"></exception>
         public async Task Process_Message_Unknown_User_Async(Message message)
         {
             if(botClient == null)
@@ -154,29 +186,25 @@ namespace ComputerTNB_ClassMgr_Bot
                 throw new NullReferenceException();
             }
 
-            try
-            {
-                // Send registration message.
-                await botClient.SendTextMessageAsync(
-                    message.Chat.Id,
+            // Send registration message.
+            await botClient.SendTextMessageAsync(
+                message.Chat.Id,
 
-                    "👋 سلام و درود ویژه خدمت شما کاربر گرامی بزرگوار\n" +
-                    "⭐ به سامانه مدیریت امور کلاسی گروه کامپیوتر تهران شمال خوش آمدید.\n\n" +
-                    $"⚠ <strong>شماره نشست کاربری فعال شما:</strong> <code>{message.Chat.Id}</code>\n\n" + 
-                    $"👈 این پیام را برای راهبر سیستم به آیدی <b>{SYSTEM_ADMIN_ID}</b> فوروارد (هدایت) کرده و سپس مشخصات ذیل را برای ایشان ارسال کنید تا ثبت نام شما در سیستم صورت گیرد:\n\n" +
-                    "1️⃣ سِمَت شما (دانشجو، استاد، ادمین)\n2️⃣نام و نام خانوادگی کامل\n3️⃣ شماره تماس منطبق با این نشست کاربری\n4️⃣ پست الکترونیکی (ایمیل)\n\n🙏 <i>سپاس از توجه شما.</i>",
+                "👋 سلام و درود ویژه خدمت شما کاربر گرامی بزرگوار\n" +
+                "⭐ به سامانه مدیریت امور کلاسی گروه کامپیوتر تهران شمال خوش آمدید.\n\n" +
+                $"⚠ <strong>شماره نشست کاربری فعال شما:</strong> <code>{message.Chat.Id}</code>\n\n" + 
+                $"👈 این پیام را برای راهبر سیستم به آیدی <b>{SYSTEM_ADMIN_ID}</b> فوروارد (هدایت) کرده و سپس مشخصات ذیل را برای ایشان ارسال کنید تا ثبت نام شما در سیستم صورت گیرد:\n\n" +
+                "1️⃣ سِمَت شما (دانشجو، استاد، ادمین)\n2️⃣نام و نام خانوادگی کامل\n3️⃣ شماره تماس منطبق با این نشست کاربری\n4️⃣ پست الکترونیکی (ایمیل)\n\n🙏 <i>سپاس از توجه شما.</i>",
 
-                    null,
-                    Telegram.Bot.Types.Enums.ParseMode.Html,
-                    null,
-                    null,
-                    false, false, message.MessageId, true, null
-                    );
-            }
-            catch(Exception ex)
-            {
+                null,
+                Telegram.Bot.Types.Enums.ParseMode.Html,
+                null,
+                null,
+                false, false, message.MessageId, true, null
+                );
 
-            }
+            // Log.
+            Logging.Log_Information($"Welcomed new user, {message.Chat.Id}");
         }
 
         #endregion
