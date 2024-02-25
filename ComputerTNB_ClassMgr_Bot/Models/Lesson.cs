@@ -18,5 +18,7 @@ namespace ComputerTNB_ClassMgr_Bot.Models
         public DateTime lessonDateTime = DateTime.MinValue;
         public DateTime examDateTime = DateTime.MinValue;
         public string? className = null;
+
+        public DateTime lessonEndTime = DateTime.MinValue;
     }
 }

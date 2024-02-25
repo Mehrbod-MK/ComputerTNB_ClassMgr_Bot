@@ -313,6 +313,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                                 string presentationCode = lessonTrims[0].Trim();
 
+                                await Prompt_Teacher_Lesson_Panel(presentationCode, teacher, message);
                             }
                         }
 
@@ -465,7 +466,9 @@ namespace ComputerTNB_ClassMgr_Bot
                 );
 
             // Log.
-            Logging.Log_Information("Displayed list of lessons for Teacher.", $"Prompt_Teacher_Lessons{teacher.chatID}");
+            Logging.Log_Information("Displayed list of lessons for Teacher.", $"Prompt_Teacher_Lessons({teacher.chatID})");
+
+            
         }
 
         private async Task Bot_SendTextMessage_Error_Async(long chatID,
@@ -482,7 +485,8 @@ namespace ComputerTNB_ClassMgr_Bot
                 if (botClient != null)
                     await botClient.SendTextMessageAsync(chatID, prompt, null,
                         Telegram.Bot.Types.Enums.ParseMode.Html, null, null,
-                        false, false, null, true);
+                        false, false, null, true,
+                        new ReplyKeyboardRemove());
             }
             catch(Exception ex)
             {
@@ -503,7 +507,8 @@ namespace ComputerTNB_ClassMgr_Bot
                 if (botClient != null)
                     await botClient.SendTextMessageAsync(chatID, prompt, null,
                         Telegram.Bot.Types.Enums.ParseMode.Html, null, null,
-                        false, false, null, true);
+                        false, false, null, true, 
+                        new ReplyKeyboardRemove());
             }
             catch (Exception ex)
             {
@@ -511,9 +516,103 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
+        private async Task Bot_SendTextMessage_Warning_Async(long chatID,
+            string infoLog,
+            string msgText, string? callingMethod = null)
+        {
+            try
+            {
+                Logging.Log_Warning(infoLog, callingMethod);
+
+                string prompt = $"⚠ <b>{msgText}</b>\n\n👈 <i>برای بازتولید پیام قبل، از /start استفاده کنید.</i>";
+
+                if (botClient != null)
+                    await botClient.SendTextMessageAsync(chatID, prompt, null,
+                        Telegram.Bot.Types.Enums.ParseMode.Html, null, null,
+                        false, false, null, true,
+                        new ReplyKeyboardRemove());
+            }
+            catch (Exception ex)
+            {
+                Logging.Log_Error(ex.Message, "Bot_SendTextMessage_Warning_Async(...)");
+            }
+        }
+
         private async Task Prompt_Teacher_Lesson_Panel(string lesson_PresentationCode, Teacher teacher, Message message)
         {
+            if (botClient == null)
+                throw new NullReferenceException();
 
+            var db_GetLessonQuery = 
+                await Program.db.SQL_GetLesson(lesson_PresentationCode);
+
+            // Check if a DB exception occured.
+            if (db_GetLessonQuery.exception != null)
+                throw db_GetLessonQuery.exception;
+
+            // Check if there are no lessons to show.
+            if(db_GetLessonQuery.result == null)
+            {
+                await Bot_SendTextMessage_Warning_Async(
+                    teacher.chatID,
+                    "No such lesson available!",
+                    $"چنین کلاس درسی با کد ارائه {lesson_PresentationCode} وجود ندارد.",
+                    $"Prompt_Teacher_Lesson_Panel({teacher.chatID})"
+                    );
+
+                return;
+            }
+
+            var lesson = (Lesson)db_GetLessonQuery.result;
+
+            // Check if teacher doesn't have the right to view lesson.
+            if(lesson.teacherChatID != teacher.chatID)
+            {
+                await Bot_SendTextMessage_Error_Async(
+                    teacher.chatID,
+                    $"Access denied - Teacher cannot view the lesson of another teacher with ChatID {lesson.teacherChatID}",
+                    $"محدودیت دسترسی وجود دارد - شما نمی‌توانید پنل درس برای استاد دیگر را مشاهده فرمایید!",
+                    $"Prompt_Teacher_Lesson_Panel({teacher.chatID})"
+                    );
+            }
+
+            // Display lesson control panel.
+            string prompt =
+                $"👈 پنل درس\n\n🔢 کد درس:    <code>{lesson.lessonCode}</code>\n" +
+                $"🔢 کد ارائه:    <code>{lesson.presentationCode}</code>\n\n" +
+                $"📖 نام درس:    <b>{lesson.lessonName}</b>\n" +
+                $"👨‍🏫 نام استاد:  <b>{teacher.fullName}</b>\n\n" +
+                $"⌚ زمان کلاس:  <b>{DBMgr.Convert_FromDateTime_ToLessonDateTimeLongString(lesson)}</b>\n" +
+                $"📅 تاریخ آزمون:   <b>{DBMgr.Convert_FromDateTime_ToPersianLongDateTimeString(lesson.examDateTime)}</b>\n\n" +
+                $"🏛 مکان برگزاری کلاس درس:    <b>{lesson.className}</b>";
+
+            // Inline buttons.
+            List<List<InlineKeyboardButton>> inlineButtons_Teacher_Lesson = new List<List<InlineKeyboardButton>>()
+            {
+                new List<InlineKeyboardButton>()
+                {
+                    InlineKeyboardButton.WithCallbackData("🎓 حضور و غیاب دانشجویان", $"ATTENDENCE~{lesson.presentationCode}"),
+                },
+
+                new List<InlineKeyboardButton>()
+                {
+                    InlineKeyboardButton.WithCallbackData("❌ بستن پنجره", "CLOSE_LESSON_PANEL"),
+                }
+            };
+
+            // Generate prompt.
+            await botClient.SendTextMessageAsync(
+                teacher.chatID,
+                prompt, null, Telegram.Bot.Types.Enums.ParseMode.Html,
+                null, null, false, true, message.MessageId, false,
+                new InlineKeyboardMarkup(inlineButtons_Teacher_Lesson)
+                );
+
+            // Log.
+            Logging.Log_Information(
+                "Displayed LESSON panel to teacher.",
+                $"Prompt_Teacher_Lesson_Panel({lesson_PresentationCode}, {teacher.chatID})"
+                );
         }
 
         #endregion

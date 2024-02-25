@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
 using MySql.Data.MySqlClient;
+using Org.BouncyCastle.Asn1.Cms;
+using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using ZstdSharp.Unsafe;
 
@@ -519,6 +521,8 @@ namespace ComputerTNB_ClassMgr_Bot
                             lessonDateTime = (DateTime)reader["LessonDateTime"],
                             examDateTime = (DateTime)reader["ExamDateTime"],
                             className = ConvertFromDBVal<string?>(reader["ClassName"]),
+
+                            lessonEndTime = (DateTime)reader["LessonEndTime"],
                         };
 
                         teacherLessons.Add(lesson);
@@ -531,6 +535,60 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         success = true,
                         result = teacherLessons,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
+        public async Task<DBResult> SQL_GetLesson(string presentCode)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM lessons " +
+                        "WHERE PresentationCode = @LESSON_PRESENT_CODE";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("LESSON_PRESENT_CODE", presentCode);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    Lesson? lesson = null;
+                    if (await reader.ReadAsync())
+                    {
+                        lesson = new Lesson()
+                        {
+                            lessonCode = (string)reader["LessonCode"],
+                            lessonName = (string)reader["lessonName"],
+                            presentationCode = (string)reader["PresentationCode"],
+                            teacherChatID = ConvertFromDBVal<long?>(reader["TeacherChatID"]),
+                            lessonDateTime = (DateTime)reader["LessonDateTime"],
+                            examDateTime = (DateTime)reader["ExamDateTime"],
+                            className = ConvertFromDBVal<string?>(reader["ClassName"]),
+                            
+                            lessonEndTime = (DateTime)reader["LessonEndTime"],
+                        };
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = lesson,
                     };
                 }
             }
@@ -567,6 +625,53 @@ namespace ComputerTNB_ClassMgr_Bot
             }
 
             return result;
+        }
+
+        public static string Convert_FromDateTime_ToLessonDateTimeLongString(Lesson lesson)
+        {
+            var time_StartLesson = lesson.lessonDateTime;
+            var time_EndLesson = lesson.lessonEndTime;
+
+            PersianCalendar pc = new PersianCalendar();
+
+            var dayOfWeek = pc.GetDayOfWeek(time_StartLesson);
+            string str_DayOfWeek = string.Empty;
+            switch(dayOfWeek)
+            {
+                case DayOfWeek.Sunday:
+                    str_DayOfWeek += "1شنبه";
+                    break;
+
+                case DayOfWeek.Monday:
+                    str_DayOfWeek += "2شنبه";
+                    break;
+
+                case DayOfWeek.Tuesday:
+                    str_DayOfWeek += "3شنبه";
+                    break;
+
+                case DayOfWeek.Wednesday:
+                    str_DayOfWeek += "4شنبه";
+                    break;
+
+                case DayOfWeek.Thursday:
+                    str_DayOfWeek += "5شنبه";
+                    break;
+
+                case DayOfWeek.Friday:
+                    str_DayOfWeek += "6جمعه";
+                    break;
+
+                case DayOfWeek.Saturday:
+                    str_DayOfWeek += "0شنبه";
+                    break;
+
+            }
+
+            string startTime = $"{pc.GetHour(time_StartLesson):00}:{pc.GetMinute(time_StartLesson)}";
+            string endTime = $"{pc.GetHour(time_EndLesson):00}:{pc.GetMinute(time_EndLesson)}";
+
+            return $"{str_DayOfWeek}، از {startTime} الی {endTime}";
         }
     }
 }
