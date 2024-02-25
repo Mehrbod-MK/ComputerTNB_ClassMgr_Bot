@@ -117,9 +117,18 @@ namespace ComputerTNB_ClassMgr_Bot
                                     "Bot_PollLoopAsync()");
                                 break;
 
+                            // Update is a message object.
                             case Telegram.Bot.Types.Enums.UpdateType.Message:
                                 if (update.Message != null)
                                     await Process_Message_Async(update.Message);
+                                break;
+
+                            // Update is a CallbackQuery.
+                            case Telegram.Bot.Types.Enums.UpdateType.CallbackQuery:
+                                if (update.CallbackQuery != null)
+                                {
+                                    await Process_CallbackQuery_Async(update.CallbackQuery);
+                                }
                                 break;
                         }
                     }
@@ -128,6 +137,37 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     
                 }
+            }
+        }
+
+        public async Task Process_CallbackQuery_Async(CallbackQuery cbQuery)
+        {
+            if (botClient == null)
+                throw new NullReferenceException();
+
+            // Process callback queries containing message.
+            if(cbQuery.Message != null)
+            {
+                long chatID = cbQuery.Message.Chat.Id;
+
+                // Process CBQUERY_MACRO Messages.
+                if (cbQuery.Data == "CLOSE_LESSON_PANEL")
+                {
+                    await botClient.AnswerCallbackQueryAsync(cbQuery.Id,
+                        "پنجره بسته شد ✅", false);
+
+                    Logging.Log_Information(
+                        "Closed LESSONS panel.",
+                        $"Process_CallbackQuery_Async({chatID})"
+                        );
+
+                    await botClient.DeleteMessageAsync(
+                        chatID,
+                        cbQuery.Message.MessageId
+                        );
+                }
+
+                var userRole = Program.db.SQL_GetUserRole(chatID);
             }
         }
 
@@ -596,7 +636,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                 new List<InlineKeyboardButton>()
                 {
-                    InlineKeyboardButton.WithCallbackData("❌ بستن پنجره", "CLOSE_LESSON_PANEL"),
+                    InlineKeyboardButton.WithCallbackData("❌ بستن پنجره درس", "CLOSE_LESSON_PANEL"),
                 }
             };
 
