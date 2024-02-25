@@ -11,6 +11,7 @@ namespace ComputerTNB_ClassMgr_Bot.Models
     /// </summary>
     public class Teacher
     {
+
         #region Teacher_Variables
 
         public long chatID = 0;
@@ -23,7 +24,7 @@ namespace ComputerTNB_ClassMgr_Bot.Models
 
         public uint state = 0;
 
-        #endregion
+        #endregion        
 
         #region Teacher_Implementations
 

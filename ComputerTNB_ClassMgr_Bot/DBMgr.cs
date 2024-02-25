@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
 using MySql.Data.MySqlClient;
+using Telegram.Bot.Exceptions;
 using ZstdSharp.Unsafe;
 
 namespace ComputerTNB_ClassMgr_Bot
@@ -38,6 +40,13 @@ namespace ComputerTNB_ClassMgr_Bot
             Student,
             Teacher,
             Admin,
+        }
+
+        public enum User_States : uint
+        {
+            At_MainMenu,
+
+            Teacher_Viewing_Lessons,
         }
 
         #endregion
@@ -425,6 +434,139 @@ namespace ComputerTNB_ClassMgr_Bot
             return
                 $"{dateTime.Year:0000}-{dateTime.Month:00}-{dateTime.Day:00} " +
                 $"{dateTime.Hour}:{dateTime.Minute}:{dateTime.Second}";
+        }
+
+        public static string Convert_FromDateTime_ToPersianLongDateTimeString(DateTime dateTime)
+        {
+            PersianCalendar pc = new PersianCalendar();
+
+            string nameOfDay = string.Empty;
+            string nameOfMonth = string.Empty;
+
+            var dayOfWeek = pc.GetDayOfWeek(dateTime);
+            switch(dayOfWeek)
+            {
+                case DayOfWeek.Saturday:    nameOfDay = "شنبه"; break;
+                case DayOfWeek.Sunday:      nameOfDay = "یکشنبه"; break;
+                case DayOfWeek.Monday:      nameOfDay = "دوشنبه"; break;
+                case DayOfWeek.Tuesday:     nameOfDay = "سه‌شنبه"; break;
+                case DayOfWeek.Wednesday:   nameOfDay = "چهارشنبه"; break;
+                case DayOfWeek.Thursday:    nameOfDay = "پنجشنبه"; break;
+                case DayOfWeek.Friday:      nameOfDay = "جمعه"; break;
+            }
+
+            var monthInYear = pc.GetMonth(dateTime);
+            switch(monthInYear)
+            {
+                case 1: nameOfMonth = "فروردین"; break;
+                case 2: nameOfMonth = "اردیبهشت"; break;
+                case 3: nameOfMonth = "خرداد"; break;
+
+                case 4: nameOfMonth = "تیر"; break;
+                case 5: nameOfMonth = "مرداد"; break;
+                case 6: nameOfMonth = "شهریور"; break;
+
+                case 7: nameOfMonth = "مهر"; break;
+                case 8: nameOfMonth = "آبان"; break;
+                case 9: nameOfMonth = "آذر"; break;
+
+                case 10: nameOfMonth = "دی"; break;
+                case 11: nameOfMonth = "بهمن"; break;
+                case 12: nameOfMonth = "اسفند"; break;
+            }
+
+            return
+                $"{nameOfDay}، {pc.GetDayOfMonth(dateTime):00} {nameOfMonth} {pc.GetYear(dateTime):0000} - " +
+                $"ساعت {pc.GetHour(dateTime):00}:{pc.GetMinute(dateTime)}:{pc.GetSecond(dateTime):00}";
+        }
+
+        /// <summary>
+        /// This method retrieves a <see cref="List{T}"/> models bound to a <see cref="Teacher"/>, providing its teacher ID.
+        /// </summary>
+        /// <param name="chatID">Primary key:  Teacher_ChatID.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure.</returns>
+        public async Task<DBResult> SQL_GetListOfTeacherLessons(long teacherID)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM lessons " +
+                        "WHERE TeacherChatID = @TEACHER_CHAT_ID";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("TEACHER_CHAT_ID", teacherID);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    List<Lesson> teacherLessons = new();
+                    while(await reader.ReadAsync())
+                    {
+                        Lesson lesson = new();
+
+                        lesson = new Lesson()
+                        {
+                            lessonCode = (string)reader["LessonCode"],
+                            lessonName = (string)reader["lessonName"],
+                            presentationCode = (string)reader["PresentationCode"],
+                            teacherChatID = ConvertFromDBVal<long?>(reader["TeacherChatID"]),
+                            lessonDateTime = (DateTime)reader["LessonDateTime"],
+                            examDateTime = (DateTime)reader["ExamDateTime"],
+                            className = ConvertFromDBVal<string?>(reader["ClassName"]),
+                        };
+
+                        teacherLessons.Add(lesson);
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = teacherLessons,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
+        /// <summary>
+        /// Updates Teacher state in database.
+        /// </summary>
+        /// <param name="teacher">The <see cref="Teacher"/> object to update its state.</param>
+        /// <param name="state">The target state.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure.</returns>
+        /// <exception cref="ApiRequestException"></exception>
+        public async Task<DBResult> SQL_Set_Teacher_State(Teacher teacher, uint state)
+        {
+            // Check if there is no need for updating...
+            if (teacher.state == state)
+                return new DBResult() { success = true, };
+
+            var result = await SQL_ExecuteWrite($"UPDATE teachers " +
+                $"SET State = {state} " +
+                $"WHERE ChatID = {teacher.chatID};");
+
+            if(result.success == false)
+            {
+                if (result.exception != null)
+                    throw result.exception;
+                else
+                    throw new ApiRequestException("وضعیت استاد در پایگاه داده به روز نشد!");
+            }
+
+            return result;
         }
     }
 }
