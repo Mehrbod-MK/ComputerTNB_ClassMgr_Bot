@@ -300,6 +300,20 @@ namespace ComputerTNB_ClassMgr_Bot
                         else
                         {
                             
+                            // Get back to previous menu.
+                            if(msg_Text == "🔙 بازگشت به منوی قبلی 🔙")
+                            {
+                                await Prompt_Menu_Main_Teacher(teacher);
+                            }
+
+                            // Process lessson name.
+                            else
+                            {
+                                var lessonTrims = msg_Text.Split("👈");
+
+                                string presentationCode = lessonTrims[0].Trim();
+
+                            }
                         }
 
                         break;
@@ -427,9 +441,14 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 keyboardButtons_Lessons.Add(new List<KeyboardButton>()
                 {
-                    new KeyboardButton($"{lesson.presentationCode} 👈 {lesson.lessonName}  ({lesson.lessonCode})"),
+                    new KeyboardButton($"{lesson.presentationCode} 👈 {lesson.lessonName} 👈 {lesson.lessonCode}"),
                 });
             }
+            // Add one extra option for getting back to previous menu.
+            keyboardButtons_Lessons.Add(new List<KeyboardButton>()
+            {
+                new KeyboardButton("🔙 بازگشت به منوی قبلی 🔙"),
+            });
 
             // Change state of teacher.
             var db_SetStateResult = await Program.db.SQL_Set_Teacher_State(teacher, (uint)DBMgr.User_States.Teacher_Viewing_Lessons);
@@ -490,6 +509,11 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 Logging.Log_Error(ex.Message, "Bot_SendTextMessage_Info_Async(...)");
             }
+        }
+
+        private async Task Prompt_Teacher_Lesson_Panel(string lesson_PresentationCode, Teacher teacher, Message message)
+        {
+
         }
 
         #endregion
