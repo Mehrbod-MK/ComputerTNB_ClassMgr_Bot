@@ -631,6 +631,11 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 new List<InlineKeyboardButton>()
                 {
+                    InlineKeyboardButton.WithCallbackData("👨‍🎓 لیست دانشجویان", $"LIST_STUDS~{lesson.presentationCode}"),
+                },
+
+                new List<InlineKeyboardButton>()
+                {
                     InlineKeyboardButton.WithCallbackData("🎓 حضور و غیاب دانشجویان", $"ATTENDENCE~{lesson.presentationCode}"),
                 },
 
