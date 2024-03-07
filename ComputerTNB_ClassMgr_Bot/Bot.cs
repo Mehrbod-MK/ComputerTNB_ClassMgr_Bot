@@ -167,7 +167,103 @@ namespace ComputerTNB_ClassMgr_Bot
                         );
                 }
 
-                var userRole = Program.db.SQL_GetUserRole(chatID);
+                // Process callback query based on user's role.
+                var userRole = await Program.db.SQL_GetUserRole(chatID);
+
+                if (userRole == DBMgr.User_Roles.Teacher)
+                {
+                    var teacherQuery = await Program.db.SQL_GetTeacher(chatID);
+                    if (teacherQuery.exception != null)
+                        throw teacherQuery.exception;
+                    if (teacherQuery.result == null)
+                        throw new NullReferenceException();
+
+                    var teacher = (Teacher)teacherQuery.result;
+
+                    await Process_CallbackQuery_Teacher_Async(teacher, cbQuery);
+                }
+                else
+                {
+                    
+                }
+            }
+        }
+
+        private async Task Process_CallbackQuery_Teacher_Async(Teacher teacher, CallbackQuery cbQuery)
+        {
+            if (botClient == null)
+                throw new NullReferenceException();
+
+            if (cbQuery.Data != null)
+            {
+                var datas = cbQuery.Data.Split('~');
+
+                // Get the list of students (LIST_STUD~{PresentationCode})
+                if (datas[0] == "LIST_STUDS")
+                {
+                    try
+                    {
+                        var listStudentsQuery =
+                            await Program.db.SQL_GetListOfLessonStudents(datas[1]);
+
+                        if (listStudentsQuery.exception != null)
+                            throw listStudentsQuery.exception;
+                        if (listStudentsQuery.result == null)
+                            throw new NullReferenceException();
+
+                        var students = (List<Student>)listStudentsQuery.result;
+                        if (students.Count <= 0)
+                        {
+                            Logging.Log_Information(
+                                $"No students to show for presentation code {datas[1]}.",
+                                $"Process_CallbackQuery_Teacher_Async({teacher.chatID}, {cbQuery.Id}) -> LIST_STUDS"
+                                );
+
+                            await botClient.AnswerCallbackQueryAsync(cbQuery.Id,
+                                "🔍 جستجو نتیجه‌ای در بر نداشت. ❕", true);
+                        }
+                        else
+                        {
+
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+
+                    }
+                }
+
+                // Check the attendence of students by image processing.
+                else if (datas[0] == "ATTENDENCE_AI")
+                {
+                    try
+                    {
+                        var lesson = (Lesson?)(await Program.db.SQL_GetLesson(datas[1])).result;
+                        if (lesson == null)
+                            throw new NullReferenceException();
+
+                        // Check the time of lesson. If outside of range, tell the teacher that they cannot check it.
+                        if(!DBMgr.Check_TimeIsCurrentForAttendence(lesson.lessonDateTime, lesson.lessonEndTime))
+                        {
+                            Logging.Log_Warning($"Time has not reached for lesson {lesson.presentationCode}!",
+                                $"Process_CallbackQuery_Teacher_Async({teacher.chatID}, {cbQuery.Id}) -> ATTENDENCE_AI");
+
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id,
+                                $"⚠ استاد {teacher.fullName} ({teacher.chatID}) در این زمان مجاز به حضور غیاب کلاس درس {lesson.lessonName} ({lesson.presentationCode}) نمی‌باشد.",
+                                true
+                                );
+                        }
+                        else
+                        {
+                            
+                        }
+                    }
+                    catch(Exception ex)
+                    {
+                        
+                    }
+                }
             }
         }
 
@@ -636,7 +732,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                 new List<InlineKeyboardButton>()
                 {
-                    InlineKeyboardButton.WithCallbackData("🎓 حضور و غیاب دانشجویان", $"ATTENDENCE~{lesson.presentationCode}"),
+                    InlineKeyboardButton.WithCallbackData("🎓 حضور و غیاب دانشجویان با پردازش تصویر 📸", $"ATTENDENCE_AI~{lesson.presentationCode}"),
                 },
 
                 new List<InlineKeyboardButton>()

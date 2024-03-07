@@ -599,6 +599,56 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
+        public async Task<DBResult> SQL_GetListOfLessonStudents(string presentationCode)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM students_x_lessons " +
+                        "WHERE Class_ID = @PRESENT_CODE";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("PRESENT_CODE", presentationCode);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    List<Student> lessonStudents = new();
+                    while (await reader.ReadAsync())
+                    {
+                        var studentQuery = await this.SQL_GetStudent(
+                            (long)reader["Student_ChatID"]
+                            );
+
+                        if (studentQuery.result == null)
+                            continue;
+
+                        lessonStudents.Add((Student)studentQuery.result);
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = lessonStudents,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
         /// <summary>
         /// Updates Teacher state in database.
         /// </summary>
@@ -672,6 +722,25 @@ namespace ComputerTNB_ClassMgr_Bot
             string endTime = $"{pc.GetHour(time_EndLesson):00}:{pc.GetMinute(time_EndLesson)}";
 
             return $"{str_DayOfWeek}، از {startTime} الی {endTime}";
+        }
+
+        public static bool Check_TimeIsCurrentForAttendence(DateTime startOfLesson, DateTime endOfLesson)
+        {
+            var now = DateTime.Now;
+
+            // Check day of week.
+            if (now.DayOfWeek != startOfLesson.DayOfWeek)
+                return false;
+
+            // Check time span.
+            long startSeconds = startOfLesson.Hour * 3600 + startOfLesson.Minute * 60 + startOfLesson.Second;
+            long endSeconds = endOfLesson.Hour * 3600 + endOfLesson.Minute * 60 + endOfLesson.Second;
+            long nowSeconds = now.Hour * 3600 + now.Minute * 60 + now.Second;
+
+            if (!(nowSeconds >= startSeconds && nowSeconds <= endSeconds))
+                return false;
+
+            return true;
         }
     }
 }
