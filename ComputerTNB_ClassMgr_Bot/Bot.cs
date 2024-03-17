@@ -243,7 +243,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             throw new NullReferenceException();
 
                         // Check the time of lesson. If outside of range, tell the teacher that they cannot check it.
-                        if(!DBMgr.Check_TimeIsCurrentForAttendence(lesson.lessonDateTime, lesson.lessonEndTime))
+                        if(!Program._IGNORE_TEACHER_LESSON_CHECKCLASSTIME && !DBMgr.Check_TimeIsCurrentForAttendence(lesson.lessonDateTime, lesson.lessonEndTime))
                         {
                             Logging.Log_Warning($"Time has not reached for lesson {lesson.presentationCode}!",
                                 $"Process_CallbackQuery_Teacher_Async({teacher.chatID}, {cbQuery.Id}) -> ATTENDENCE_AI");
@@ -256,7 +256,36 @@ namespace ComputerTNB_ClassMgr_Bot
                         }
                         else
                         {
-                            
+                            // Answer callback query.
+                            await botClient.AnswerCallbackQueryAsync(cbQuery.Id);
+
+                            // Update user's state and set metadata to PRESENTATION-CODE of the lesson to check its attendence status.
+                            await Program.db.SQL_Set_User_State(teacher, (uint)DBMgr.User_States.Teacher_Checking_Lesson_Attendence);
+                            await Program.db.SQL_Set_User_MetaData(teacher, datas[1]);
+
+                            // Prompt user to send images for processing.
+                            List<List<KeyboardButton>> keyboardButtons_BeginImgProc = new List<List<KeyboardButton>>()
+                            {
+                                new List<KeyboardButton>()
+                                {
+                                    KeyboardButton.WithRequestUser("👨‍🎓 انتخاب چت/نشست کاربری دانشجو به صورت دستی 👩‍🎓", new KeyboardButtonRequestUser() { UserIsBot = false, }),
+                                },
+                                new List<KeyboardButton>()
+                                {
+                                    new KeyboardButton("🏁 پایان عملیات حضور و غیاب 🏁"),
+                                },
+                            };
+                            await botClient.SendTextMessageAsync(
+                                teacher.chatID,
+                                $"👈 پنل حضور و غیاب\n\n" +
+                                $"👨‍🏫👩‍🏫 استاد: <b> {teacher.fullName} ({teacher.chatID})</b>\n" +
+                                $"🏛 کلاس:  <b><u>{lesson.lessonName} ({lesson.presentationCode})\n\n</u></b>" +
+                                $"📷 سامانه آماده پردازش تصویر چهره دانشجویان حاضر در کلاس می باشد.\n" +
+                                $"🖼 به یاد داشته باشید که تا حد امکان، تصویر واضج باشد. سامانه، اطراف چهره هایی که شناسایی می کند، مستطیلی می کشد. سپس شما با تأیید هویت تشخیص داده شده، حضور و غیاب دانشجوی محترم را تأیید میفرمایید.\n\n" +
+                                $"<i>برای باز کردن دوربین، بر روی دکمه سنجاق 🧷 در پیام رسان کلیک کنید: 👇</i>",
+                                null, Telegram.Bot.Types.Enums.ParseMode.Html, null,
+                                false, false, true, null, true, new ReplyKeyboardMarkup(keyboardButtons_BeginImgProc)
+                                );
                         }
                     }
                     catch(Exception ex)
@@ -492,7 +521,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 $"❔ چه کمکی از ما ساخته است؟ از منوی ذیل، انتخاب کنید: 👇";
 
             // Update teacher's state.
-            await Program.db.SQL_Set_Teacher_State(teacher, (uint)DBMgr.User_States.At_MainMenu);
+            await Program.db.SQL_Set_User_State(teacher, (uint)DBMgr.User_States.At_MainMenu);
 
             await botClient.SendTextMessageAsync(
                 teacher.chatID,
@@ -588,7 +617,7 @@ namespace ComputerTNB_ClassMgr_Bot
             });
 
             // Change state of teacher.
-            var db_SetStateResult = await Program.db.SQL_Set_Teacher_State(teacher, (uint)DBMgr.User_States.Teacher_Viewing_Lessons);
+            var db_SetStateResult = await Program.db.SQL_Set_User_State(teacher, (uint)DBMgr.User_States.Teacher_Viewing_Lessons);
             if (db_SetStateResult.exception != null)
                 throw db_SetStateResult.exception;
 

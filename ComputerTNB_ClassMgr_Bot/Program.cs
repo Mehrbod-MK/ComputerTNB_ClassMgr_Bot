@@ -5,6 +5,12 @@ namespace ComputerTNB_ClassMgr_Bot
 {
     internal class Program
     {
+        #region PROGRAM_CONSTANTS
+
+        public static bool _IGNORE_TEACHER_LESSON_CHECKCLASSTIME = true;
+
+        #endregion
+
         #region Program_Variables
 
         /// <summary>

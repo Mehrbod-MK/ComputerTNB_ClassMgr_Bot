@@ -49,6 +49,8 @@ namespace ComputerTNB_ClassMgr_Bot
             At_MainMenu,
 
             Teacher_Viewing_Lessons,
+
+            Teacher_Checking_Lesson_Attendence,
         }
 
         #endregion
@@ -254,6 +256,8 @@ namespace ComputerTNB_ClassMgr_Bot
                             phoneNumber = ConvertFromDBVal<string?>(reader["PhoneNumber"]),
 
                             state = (uint)reader["State"],
+
+                            __meta = ConvertFromDBVal<string?>(reader["__meta"]),
                         };
                     }
 
@@ -650,13 +654,13 @@ namespace ComputerTNB_ClassMgr_Bot
         }
 
         /// <summary>
-        /// Updates Teacher state in database.
+        /// Updates User State in database.
         /// </summary>
         /// <param name="teacher">The <see cref="Teacher"/> object to update its state.</param>
         /// <param name="state">The target state.</param>
         /// <returns>This task returns a <see cref="DBResult"/> structure.</returns>
         /// <exception cref="ApiRequestException"></exception>
-        public async Task<DBResult> SQL_Set_Teacher_State(Teacher teacher, uint state)
+        public async Task<DBResult> SQL_Set_User_State(Teacher teacher, uint state)
         {
             // Check if there is no need for updating...
             if (teacher.state == state)
@@ -741,6 +745,36 @@ namespace ComputerTNB_ClassMgr_Bot
                 return false;
 
             return true;
+        }
+
+        /// <summary>
+        /// Updates User's META data.
+        /// </summary>
+        /// <param name="teacher">The <see cref="Teacher"/> object to update its metadata.</param>
+        /// <param name="state">The target metadatas.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure.</returns>
+        public async Task<DBResult> SQL_Set_User_MetaData(Teacher teacher, string? metaData)
+        {
+            DBResult result;
+
+            if (string.IsNullOrEmpty(metaData))
+                result = await SQL_ExecuteWrite($"UPDATE teachers " +
+                    $"SET __META = NULL" +
+                    $"WHERE ChatID = {teacher.chatID}");
+            else
+                result = await SQL_ExecuteWrite($"UPDATE teachers " +
+                    $"SET __META = \'{metaData}\' " +
+                    $"WHERE ChatID = {teacher.chatID};");
+
+            if (result.success == false)
+            {
+                if (result.exception != null)
+                    throw result.exception;
+                else
+                    throw new ApiRequestException("وضعیت استاد در پایگاه داده به روز نشد!");
+            }
+
+            return result;
         }
     }
 }

@@ -24,6 +24,8 @@ namespace ComputerTNB_ClassMgr_Bot.Models
 
         public uint state = 0;
 
+        public string? __meta = null;
+
         #endregion        
 
         #region Teacher_Implementations
