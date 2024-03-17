@@ -250,7 +250,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                             await botClient.AnswerCallbackQueryAsync(
                                 cbQuery.Id,
-                                $"⚠ استاد {teacher.fullName} ({teacher.chatID}) در این زمان مجاز به حضور غیاب کلاس درس {lesson.lessonName} ({lesson.presentationCode}) نمی‌باشد.",
+                                $"⚠ استاد {teacher.fullName} ({teacher.chatID}) در این زمان، مجاز به حضور غیاب کلاس درس {lesson.lessonName} ({lesson.presentationCode}) نمی‌باشد.",
                                 true
                                 );
                         }
