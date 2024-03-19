@@ -776,5 +776,64 @@ namespace ComputerTNB_ClassMgr_Bot
 
             return result;
         }
+
+        /// <summary>
+        /// Gets a <see cref="List{T}"/> of <see cref="string"/>s representing file paths to images for AI model training.
+        /// </summary>
+        /// <param name="ai_PersonModelIndex">The AI model index associated with a person in DB. If set to <see cref="null"/>, then all images will be returned.</param>
+        /// <returns></returns>
+        public async Task<DBResult> SQL_Get_ListOfImagesPaths(uint? ai_PersonModelIndex = null)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = string.Empty;
+                    if (ai_PersonModelIndex != null)
+                        commandText = "SELECT * FROM images " +
+                            "WHERE PresentationCode = @AI_MODEL_INDEX";
+                    else
+                        commandText = "SELECT * FROM images";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    if (ai_PersonModelIndex != null)
+                        command.Parameters.AddWithValue("AI_MODEL_INDEX", ai_PersonModelIndex);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    List<AI_ImageIndex> imageIndices = new List<AI_ImageIndex>();
+                    if (await reader.ReadAsync())
+                    {
+                        AI_ImageIndex imgIdx = new AI_ImageIndex()
+                        {
+                            imagePath = (string)reader["Image_RelativePath"],
+                            ai_ModelIndex = (int)reader["AI_ModelIndex"],
+                        };
+
+                        imageIndices.Add(imgIdx);
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = imageIndices,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
     }
 }
