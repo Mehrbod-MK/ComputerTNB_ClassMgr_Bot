@@ -532,7 +532,10 @@ namespace ComputerTNB_ClassMgr_Bot
                         }
 
                         // Delete Loading msg.
-                        await botClient.DeleteMessageAsync(teacher.chatID, msg.MessageId);
+                        await Bot_DeleteMessageWithNoError_Async(teacher.chatID, msg.MessageId);
+
+                        // Generate faces message bubbles.
+
 
                         break;
                 }
@@ -835,6 +838,19 @@ namespace ComputerTNB_ClassMgr_Bot
                 "Displayed LESSON panel to teacher.",
                 $"Prompt_Teacher_Lesson_Panel({lesson_PresentationCode}, {teacher.chatID})"
                 );
+        }
+
+        public async Task Bot_DeleteMessageWithNoError_Async(long chatId, int messageId)
+        {
+            if (botClient == null)
+                throw new NullReferenceException();
+
+            try
+            {
+                await botClient.DeleteMessageAsync(chatId, messageId);
+            }
+            catch(Exception)
+            { }
         }
 
         #endregion
