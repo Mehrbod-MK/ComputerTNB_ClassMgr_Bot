@@ -862,9 +862,12 @@ namespace ComputerTNB_ClassMgr_Bot
                 // Validate Unique FileName.
                 string fileName = string.Join("_", photo.FileUniqueId.Split(Path.GetInvalidFileNameChars()));
 
-                // Create new unique file.
+                // Create directory.
+                Directory.CreateDirectory(directory);
+
+                // Create new unique file. (+ EXTENSION?)
                 FileStream fstream = new FileStream(
-                    Path.Combine(new string[] { directory, fileName }), FileMode.CreateNew, FileAccess.ReadWrite
+                    Path.Combine(new string[] { directory, fileName }), FileMode.Create, FileAccess.ReadWrite
                     );
                 string finalFileName = fstream.Name;
 

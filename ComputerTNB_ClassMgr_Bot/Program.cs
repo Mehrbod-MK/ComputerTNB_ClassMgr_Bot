@@ -125,6 +125,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     break;
                 }
             }
+            
 
             // Exit application successfully.
             return 0;

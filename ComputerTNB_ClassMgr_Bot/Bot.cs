@@ -1,5 +1,6 @@
 ﻿using ComputerTNB_ClassMgr_Bot.Models;
 using ComputerTNB_ClassMgr_Bot.Resources.Strings;
+using OpenCvSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -489,7 +490,6 @@ namespace ComputerTNB_ClassMgr_Bot
             ////////////////////////////////////////////////////////////////////////////////
 
             ///////////////////////////// PROCESS PHOTO MESSAGE /////////////////////////////
-            
             else if(message.Photo != null)
             {
                 // Obtain the best quality photo.
@@ -506,7 +506,33 @@ namespace ComputerTNB_ClassMgr_Bot
                 switch(teacher.state)
                 {
                     case (uint)DBMgr.User_States.Teacher_Checking_Lesson_Attendence:
-                        
+                        // Send "Loading..." emoji.
+                        var msg = await botClient.SendTextMessageAsync(teacher.chatID, "⌛");
+
+                        // Download the photo of the students in the class.
+                        var download_Query = await Program.db.FILE_Photo_SubmitToDirectory(botClient, bestQualityPhoto);
+                        if (download_Query.exception != null)
+                            throw download_Query.exception;
+                        if (download_Query.result == null)
+                            throw new NullReferenceException();
+
+                        // Send this to AI model for face recognition.
+                        var photoFilePath = (string)download_Query.result;
+                        var photoFileExtension = Path.GetExtension(photoFilePath);
+                        var faces = Program.ai.AI_DetectAndTagFaces(photoFilePath, out OpenCvSharp.Mat rendered);
+
+                        // Save rendered picture to local TEMP directory.
+                        var finalPath = AI_ImgProc.Mat_Save_Temp(rendered, photoFileExtension);
+
+                        // Upload render result after temp save.
+                        using(FileStream fs = new FileStream(finalPath, FileMode.Open))
+                        {
+                            var photo = InputFile.FromStream(fs, Path.GetFileName(photoFilePath));
+                            await botClient.SendPhotoAsync(teacher.chatID, photo);
+                        }
+
+                        // Delete Loading msg.
+                        await botClient.DeleteMessageAsync(teacher.chatID, msg.MessageId);
 
                         break;
                 }
