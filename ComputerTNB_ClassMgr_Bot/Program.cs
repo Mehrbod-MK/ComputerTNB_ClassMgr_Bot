@@ -1,4 +1,5 @@
 ﻿using MySql.Data.MySqlClient;
+using Org.BouncyCastle.Tsp;
 using System.Diagnostics.CodeAnalysis;
 
 namespace ComputerTNB_ClassMgr_Bot
@@ -18,6 +19,11 @@ namespace ComputerTNB_ClassMgr_Bot
         /// DB Manager object for manipulating MySQL database.
         /// </summary>
         public static DBMgr db;
+
+        /// <summary>
+        /// AI Image Process object for image recognition functions.
+        /// </summary>
+        public static AI_ImgProc ai;
 
         /// <summary>
         /// Bot object for communicating with Telegram cloud.
@@ -86,6 +92,11 @@ namespace ComputerTNB_ClassMgr_Bot
                 Console.ReadLine();
                 return -1;
             }
+
+            // Create AI Model.
+            ai = new();
+            var aiTask = Task.Run(async () => { await ai.BeginTrain(); });
+            aiTask.Wait();
 
             // Get bot token.
             string? botToken =

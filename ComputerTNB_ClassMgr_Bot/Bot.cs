@@ -259,7 +259,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             // Answer callback query.
                             await botClient.AnswerCallbackQueryAsync(cbQuery.Id);
 
-                            // Update user's state and set metadata to PRESENTATION-CODE of the lesson to check its attendence status.
+                            // Update teacher's state and set metadata to PRESENTATION-CODE of the lesson to check its attendence status.
                             await Program.db.SQL_Set_User_State(teacher, (uint)DBMgr.User_States.Teacher_Checking_Lesson_Attendence);
                             await Program.db.SQL_Set_User_MetaData(teacher, datas[1]);
 
@@ -487,6 +487,32 @@ namespace ComputerTNB_ClassMgr_Bot
 
             }
             ////////////////////////////////////////////////////////////////////////////////
+
+            ///////////////////////////// PROCESS PHOTO MESSAGE /////////////////////////////
+            
+            else if(message.Photo != null)
+            {
+                // Obtain the best quality photo.
+                PhotoSize bestQualityPhoto = message.Photo[0];
+                foreach(var photoQual in message.Photo)
+                {
+                    if(photoQual.FileSize > bestQualityPhoto.FileSize)
+                    {
+                        bestQualityPhoto = photoQual;
+                    }
+                }
+
+                // Check teacher state.
+                switch(teacher.state)
+                {
+                    case (uint)DBMgr.User_States.Teacher_Checking_Lesson_Attendence:
+                        
+
+                        break;
+                }
+            }
+
+            /////////////////////////////////////////////////////////////////////////////////
         }
 
         private async Task Prompt_Menu_Main_Teacher(Teacher teacher)

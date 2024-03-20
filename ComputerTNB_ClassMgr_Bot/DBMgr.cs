@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
@@ -833,6 +834,58 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 return new DBResult()
                 { exception = ex, result = null, success = false };
+            }
+        }
+
+        /// <summary>
+        /// Retrieves a globally unique identifier (GUID), for unique objects in time.
+        /// </summary>
+        /// <returns>This method returns a standardized FileName <see cref="string"/>.</returns>
+        public static string _GET_GUID()
+        {
+            var guid = Guid.NewGuid();
+            var str = Convert.ToBase64String(guid.ToByteArray());
+            return string.Join(string.Empty, str.Split(Path.GetInvalidFileNameChars()));
+        }
+
+        /// <summary>
+        /// Downloads a <see cref="Telegram.Bot.Types.PhotoSize"/> and submits it to local directory structure.
+        /// </summary>
+        /// <param name="botClient">Telegram bot client to download the file from.</param>
+        /// <param name="photo">The received Photo object.</param>
+        /// <param name="directory">Relative directory to store the image to.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure. <see cref="DBResult.result"/> contains the absolute path of the submitted file.</returns>
+        public async Task<DBResult> FILE_Photo_SubmitToDirectory(TelegramBotClient botClient, Telegram.Bot.Types.PhotoSize photo, string directory = "photos")
+        {
+            try
+            {
+                // Validate Unique FileName.
+                string fileName = string.Join("_", photo.FileUniqueId.Split(Path.GetInvalidFileNameChars()));
+
+                // Create new unique file.
+                FileStream fstream = new FileStream(
+                    Path.Combine(new string[] { directory, fileName }), FileMode.CreateNew, FileAccess.ReadWrite
+                    );
+                string finalFileName = fstream.Name;
+
+                // Download and submit file.
+                await botClient.GetInfoAndDownloadFileAsync(photo.FileId, fstream);
+
+                // Close file handle.
+                fstream.Close();
+                fstream.Dispose();
+
+                return new DBResult()
+                {
+                    result = finalFileName,
+                    success = true,
+                    exception = null,
+                };
+            }
+            catch(Exception ex)
+            {
+                return new DBResult()
+                { success = false, result = null, exception = ex };
             }
         }
     }

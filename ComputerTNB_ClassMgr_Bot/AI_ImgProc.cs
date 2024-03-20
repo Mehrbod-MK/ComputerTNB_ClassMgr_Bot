@@ -4,8 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
+using Mysqlx.Notice;
 using OpenCvSharp;
 using OpenCvSharp.Face;
+using Telegram.Bot.Types.InlineQueryResults;
 
 namespace ComputerTNB_ClassMgr_Bot
 {
@@ -17,6 +19,9 @@ namespace ComputerTNB_ClassMgr_Bot
         #region AI_ImgProc_CONSTANTS
 
         public const string AI_IMG_MODEL_XML = @"haarcascade_frontalface_default.xml";
+        public const string AI_IMG_DEFAULT_DATASET_FOLDER = @"dataset";
+
+        public const uint AI_LIMIT_IMAGES_LOAD = 256;
 
         #endregion
 
@@ -57,6 +62,31 @@ namespace ComputerTNB_ClassMgr_Bot
             // Clear MATs and labels.
             mats_Faces = new List<Mat>();
             mats_Labels = new List<int>();
+
+            // Load default dataset.
+            Logging.Log_Information("BEGIN -> Load default faces dataset...", "AI_IMG_PROC -> DEFAULT DATASET");
+            var imageFiles = Directory.GetFiles(AI_IMG_DEFAULT_DATASET_FOLDER,
+                "*.*", SearchOption.AllDirectories);
+            uint loadsRemaining = AI_LIMIT_IMAGES_LOAD;
+            foreach (var imageFile in imageFiles)
+            {
+                if (loadsRemaining == 0)
+                    break;
+
+                Mat matInfo = new Mat(imageFile, ImreadModes.Grayscale);
+                if (matInfo.Rows <= 0 || matInfo.Cols <= 0)
+                    continue;
+
+                mats_Faces.Add(
+                    matInfo
+                    );
+                mats_Labels.Add(1);
+
+                Logging.Log_Information($"Loaded:  {imageFile}.", "AI_IMG_PROC -> DEFAULT DATASET");
+
+                loadsRemaining--;
+            }
+            Logging.Log_Information("END -> Load default faces dataset.", "AI_IMG_PROC -> DEFAULT DATASET");
 
             Logging.Log_Information("Fetching image indices for AI model training...", "AI_IMGPROC -> BeginTrain()");
             var imagePaths_Query = await Program.db.SQL_Get_ListOfImagesPaths();
@@ -99,7 +129,41 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
-        
+        public List<KeyValuePair<Mat, int>> AI_DetectAndTagFaces(
+            string pathToPhoto, out Mat renderResult
+            )
+        {
+            List<KeyValuePair<Mat, int>> result = new();
+
+            Mat frame = Cv2.ImRead(pathToPhoto);
+            Mat grayFrame = new Mat();
+            Cv2.CvtColor(frame, grayFrame, ColorConversionCodes.BGR2GRAY);
+
+            // Extract faces.
+            Rect[] faces = faceCascade.DetectMultiScale(grayFrame, 1.1, 4);
+
+            // Enumerate detected faces.
+            foreach(var face in faces)
+            {
+                // Recognize face.
+                using(Mat faceROI = new Mat(grayFrame, face))
+                {
+                    model.Predict(faceROI, out int label, out double confidence);
+
+                    result.Add(
+                        new KeyValuePair<Mat, int>(faceROI, label)
+                    );
+
+                    Cv2.Rectangle(frame, face, Scalar.Blue, 2);
+
+                    // Put the label near the rectangle
+                    Cv2.PutText(frame, label.ToString(), new Point(face.X, face.Y - 10), HersheyFonts.HersheyPlain, 1.2, Scalar.Green, 2);
+                }
+            }
+
+            renderResult = frame;
+            return result;
+        }
 
         #endregion
     }
