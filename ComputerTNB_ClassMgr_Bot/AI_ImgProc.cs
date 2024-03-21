@@ -130,11 +130,11 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
-        public List<KeyValuePair<Mat, int>> AI_DetectAndTagFaces(
+        public List<KeyValuePair<MemoryStream, int>> AI_DetectAndTagFaces(
             string pathToPhoto, out Mat renderResult
             )
         {
-            List<KeyValuePair<Mat, int>> result = new();
+            List<KeyValuePair<MemoryStream, int>> result = new();
 
             Mat frame = Cv2.ImRead(pathToPhoto);
             Mat grayFrame = new Mat();
@@ -151,8 +151,12 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     model.Predict(faceROI, out int label, out double confidence);
 
+                    MemoryStream memoryStream = new MemoryStream();
+                    var bmp = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(faceROI);
+                    bmp.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+
                     result.Add(
-                        new KeyValuePair<Mat, int>(faceROI, label)
+                        new KeyValuePair<MemoryStream, int>(memoryStream, label)
                     );
 
                     Cv2.Rectangle(frame, face, Scalar.Red, 4);

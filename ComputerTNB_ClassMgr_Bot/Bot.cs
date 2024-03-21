@@ -853,7 +853,7 @@ namespace ComputerTNB_ClassMgr_Bot
             { }
         }
 
-        public async Task Prompt_Teacher_FaceBubbles(Teacher teacher, List<KeyValuePair<Mat, int>> faces)
+        public async Task Prompt_Teacher_FaceBubbles(Teacher teacher, List<KeyValuePair<MemoryStream, int>> faces)
         {
             if (Program.db == null || botClient == null)
                 throw new NullReferenceException();
@@ -900,24 +900,28 @@ namespace ComputerTNB_ClassMgr_Bot
                 inlineKeyboardButtons_FaceRecognition.Add(new()
                 { InlineKeyboardButton.WithCallbackData("❌ بستن پنل ", $"CLOSE_ATTENDEE_PANEL~{teacher.chatID}")});
 
-                Console.WriteLine("\n\nBREAKPOINT REACHED\n\n");
+                /*Console.WriteLine("\n\nBREAKPOINT REACHED\n\n");*/
+                /*Console.WriteLine($"\n\n" +
+                    $"{face.Key.Capacity}\n\n");*/
+                // Reset stream position in memory.
+                face.Key.Seek(0, SeekOrigin.Begin);
 
                 // Convert MAT to bitmap.
-                var bitmapFace = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(face.Key);
+                /*var bitmapFace = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(face.Key);
                 MemoryStream memoryStream = new MemoryStream();
-                bitmapFace.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+                bitmapFace.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);*/
 
                 // Send message bubble.
-                InputFile photoStudent = InputFile.FromStream(memoryStream);
+                InputFile photoStudent = InputFile.FromStream(face.Key);
                 await botClient.SendPhotoAsync(teacher.chatID, photoStudent,
                     null, captionText, Telegram.Bot.Types.Enums.ParseMode.Html,
                     null, false, false, true, null, true,
                     new InlineKeyboardMarkup(inlineKeyboardButtons_FaceRecognition));
 
                 // Dispose objects.
-                memoryStream.Close();
+                /*memoryStream.Close();
                 memoryStream.Dispose();
-                bitmapFace.Dispose();
+                bitmapFace.Dispose();*/
             }
         }
 
