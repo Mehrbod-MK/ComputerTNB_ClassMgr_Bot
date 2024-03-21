@@ -24,7 +24,7 @@ namespace ComputerTNB_ClassMgr_Bot.Models
 
         public uint state = 0;
 
-        public uint ai_ModelIndex = 0;
+        public int ai_ModelIndex = 0;
 
         #endregion
 

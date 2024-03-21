@@ -535,7 +535,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         await Bot_DeleteMessageWithNoError_Async(teacher.chatID, msg.MessageId);
 
                         // Generate faces message bubbles.
-
+                        await Prompt_Teacher_FaceBubbles(teacher, faces);
 
                         break;
                 }
@@ -851,6 +851,74 @@ namespace ComputerTNB_ClassMgr_Bot
             }
             catch(Exception)
             { }
+        }
+
+        public async Task Prompt_Teacher_FaceBubbles(Teacher teacher, List<KeyValuePair<Mat, int>> faces)
+        {
+            if (Program.db == null || botClient == null)
+                throw new NullReferenceException();
+
+            foreach(var face in faces)
+            {
+                var findStudent_Query = await Program.db.SQL_GetStudent_ByAIModelIndex(face.Value);
+                if (findStudent_Query.exception != null)
+                    throw findStudent_Query.exception;
+
+                var findStudent = (Student?)findStudent_Query.result;
+
+                string captionText = string.Empty;
+                List<List<InlineKeyboardButton>> inlineKeyboardButtons_FaceRecognition = new();
+
+                if (findStudent == null)
+                {
+                    captionText = $"🖼 هویت چهره تشخیص داده شده نامعین است. ❔\n\n" +
+                        $"👇 لطفاً از کلیدهای ذیل، اقدام به شناساندن تصویر به سامانه فرمایید:";
+
+                    inlineKeyboardButtons_FaceRecognition.Add(new()
+                    { InlineKeyboardButton.WithCallbackData("👨‍🎓 معرفی دانشجو به سامانه 👩‍🎓", $"IDENTIFY_STUD_PIC~{teacher.chatID}") });
+                }
+                else
+                {
+                    captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{findStudent.chatID}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
+
+                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<ulong>($"SELECT COUNT(*) FROM attends " +
+                        $"WHERE Student_ChatID= {findStudent.chatID} and " +
+                        $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
+                        $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
+                    if (isStudentAlreadyAttended_Query.result == null)
+                        throw new NullReferenceException();
+                    bool isStudentAlreadyAttended = (ulong)isStudentAlreadyAttended_Query.result != 0;
+
+                    if (!isStudentAlreadyAttended)
+                        inlineKeyboardButtons_FaceRecognition.Add(new()
+                        { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}") });
+                    else
+                        inlineKeyboardButtons_FaceRecognition.Add(new()
+                        { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.chatID}") });
+                }
+
+                inlineKeyboardButtons_FaceRecognition.Add(new()
+                { InlineKeyboardButton.WithCallbackData("❌ بستن پنل ", $"CLOSE_ATTENDEE_PANEL~{teacher.chatID}")});
+
+                Console.WriteLine("\n\nBREAKPOINT REACHED\n\n");
+
+                // Convert MAT to bitmap.
+                var bitmapFace = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(face.Key);
+                MemoryStream memoryStream = new MemoryStream();
+                bitmapFace.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+
+                // Send message bubble.
+                InputFile photoStudent = InputFile.FromStream(memoryStream);
+                await botClient.SendPhotoAsync(teacher.chatID, photoStudent,
+                    null, captionText, Telegram.Bot.Types.Enums.ParseMode.Html,
+                    null, false, false, true, null, true,
+                    new InlineKeyboardMarkup(inlineKeyboardButtons_FaceRecognition));
+
+                // Dispose objects.
+                memoryStream.Close();
+                memoryStream.Dispose();
+                bitmapFace.Dispose();
+            }
         }
 
         #endregion

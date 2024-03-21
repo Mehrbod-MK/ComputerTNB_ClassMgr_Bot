@@ -9,8 +9,10 @@ using System.Threading.Tasks;
 using ComputerTNB_ClassMgr_Bot.Models;
 using MySql.Data.MySqlClient;
 using Org.BouncyCastle.Asn1.Cms;
+using Org.BouncyCastle.Bcpg.OpenPgp;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
+using Telegram.Bot.Types;
 using ZstdSharp.Unsafe;
 
 namespace ComputerTNB_ClassMgr_Bot
@@ -199,6 +201,8 @@ namespace ComputerTNB_ClassMgr_Bot
                             studentId = ConvertFromDBVal<string?>(reader["StudentID"]),
 
                             state = (uint)reader["State"],
+
+                            ai_ModelIndex = (int)reader["AI_ModelIndex"],
                         };
                     }
 
@@ -213,6 +217,63 @@ namespace ComputerTNB_ClassMgr_Bot
                 }
             }
             catch(Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
+        public async Task<DBResult> SQL_GetStudent_ByAIModelIndex(int ai_ModelIndex)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM students " +
+                        "WHERE AI_ModelIndex = @MODEL_INDEX";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("MODEL_INDEX", ai_ModelIndex);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    Student? student = null;
+                    if (await reader.ReadAsync())
+                    {
+                        student = new Student()
+                        {
+                            chatID = (long)reader["ChatID"],
+                            email = ConvertFromDBVal<string?>(reader["Email"]),
+                            firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
+                            lastName = ConvertFromDBVal<string?>(reader["LastName"]),
+                            joinedDate = (DateTime)reader["JoinDate"],
+                            lastActivity = (DateTime)reader["LastActivity"],
+                            phoneNumber = ConvertFromDBVal<string?>(reader["PhoneNumber"]),
+                            studentId = ConvertFromDBVal<string?>(reader["StudentID"]),
+
+                            state = (uint)reader["State"],
+
+                            ai_ModelIndex = (int)reader["AI_ModelIndex"],
+                        };
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = student,
+                    };
+                }
+            }
+            catch (Exception ex)
             {
                 return new DBResult()
                 { exception = ex, result = null, success = false };
@@ -437,6 +498,45 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
         
+        /// <summary>
+        /// Generic function for executing a SINGLE-FIELD result for SQL query.
+        /// </summary>
+        /// <typeparam name="S">Type of FIELD to be expected from SQL query result.</typeparam>
+        /// <param name="sqlCommand">The SQL command to execute.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure, which its result contains the type expected.</returns>
+        public async Task<DBResult> SQL_ExecuteScalar<S>(string sqlCommand)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = sqlCommand;
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.ConfigureAwait(false);
+
+                    S? resultScalar = (S?)await command.ExecuteScalarAsync();
+
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = resultScalar,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
         public static string Convert_FromDateTime_ToSQLString(DateTime dateTime)
         {
             return
@@ -847,6 +947,26 @@ namespace ComputerTNB_ClassMgr_Bot
             var guid = Guid.NewGuid();
             var str = Convert.ToBase64String(guid.ToByteArray());
             return string.Join(string.Empty, str.Split(Path.GetInvalidFileNameChars()));
+        }
+
+        /// <summary>
+        /// Converts an input <see cref="DateTime"/> structure to standard DATE SQL Structure.
+        /// </summary>
+        /// <param name="dateTime">The input <see cref="DateTime"/> structure to convert.</param>
+        /// <returns>This method returns the <see cref="string"/> of the standardized DATE SQL.</returns>
+        public static string Convert_FromDateTime_ToSQLDateString(DateTime dateTime)
+        {
+            return $"{dateTime.Year:0000}-{dateTime.Month:00}-{dateTime.Day:00}";
+        }
+
+        public static DateTime Convert_FromSQLDateString_ToDateTime(string sqlDateStr)
+        {
+            var dateParts = sqlDateStr.Trim('-');
+            if (dateParts.Length < 3)
+                return DateTime.MinValue;
+
+            DateTime dt = new DateTime(Convert.ToInt32(dateParts[0]), Convert.ToInt32(dateParts[1]), Convert.ToInt32(dateParts[2]));
+            return dt;
         }
 
         /// <summary>
