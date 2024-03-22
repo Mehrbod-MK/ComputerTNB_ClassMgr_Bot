@@ -44,7 +44,7 @@ namespace ComputerTNB_ClassMgr_Bot
             this.botToken = botGlobalToken;
             this.customServer = customServer;
 
-            if(autoConnect)
+            if (autoConnect)
                 botClient = new TelegramBotClient(botGlobalToken, customServer);
         }
 
@@ -93,7 +93,7 @@ namespace ComputerTNB_ClassMgr_Bot
             if (Program.db == null)
                 return;
 
-            while(true)
+            while (true)
             {
                 // Check cancellation event.
                 if (ct != null)
@@ -105,16 +105,16 @@ namespace ComputerTNB_ClassMgr_Bot
                     var updates = await botClient.GetUpdatesAsync(updateOffset, null, 3);
 
                     // Check incoming updates.
-                    foreach(var update in updates)
+                    foreach (var update in updates)
                     {
                         updateOffset = update.Id + 1;
 
                         // Check incoming update type.
-                        switch(update.Type)
+                        switch (update.Type)
                         {
                             // Update is unknown!
                             case Telegram.Bot.Types.Enums.UpdateType.Unknown:
-                                Logging.Log_Warning($"Unkown update received with ID:\t{update.Id}.", 
+                                Logging.Log_Warning($"Unkown update received with ID:\t{update.Id}.",
                                     "Bot_PollLoopAsync()");
                                 break;
 
@@ -134,11 +134,48 @@ namespace ComputerTNB_ClassMgr_Bot
                         }
                     }
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
-                    
+
                 }
             }
+        }
+
+        /// <summary>
+        /// Processes an incoming MACRO TEXT command from bot (usually started with /)
+        /// </summary>
+        /// <param name="chatID">User's chat ID.</param>
+        /// <param name="msgText">The message text body.</param>
+        /// <returns>This task returns a <see cref="bool"/>, representing if the provided text was a macro command or not.</returns>
+        public async Task<bool> Process_MACROCMD_Text_Async(long chatID, string msgText, Message replyTo)
+        {
+            try
+            {
+                if (botClient == null)
+                    throw new NullReferenceException();
+
+                string rawTxt = msgText.ToLower().Trim();
+
+                // /GETID -> Returns the ID of the current user.
+                if(rawTxt == "/getid")
+                {
+                    await botClient.SendTextMessageAsync(chatID
+                        , $"<b>🔑 شماره نشست کاربری شما:  <code>{chatID}</code></b>\n\n👈 <i>می توانید با کلیک بر روش شماره، آن را در کلیپ بورد سیستم کپی کنید، یا پیام را برای شخصی دیگر هدایت (فوروارد) کنید.</i>",
+                        null, Telegram.Bot.Types.Enums.ParseMode.Html, null, null, false, false, replyTo.MessageId, false);
+
+                    Logging.Log_Information("Processed /GETID Macro Command.", $"Process_MACROCMD_Text_Async({chatID}, {msgText}, {replyTo.MessageId})");
+
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logging.Log_Error($"Error occured when processing MACRO command:  {ex.ToString()}", $"Process_MACROCMD_Text_Async({chatID}, {msgText}, {replyTo.MessageId})");
+
+                return false;
+            }
+
+            return false;
         }
 
         public async Task Process_CallbackQuery_Async(CallbackQuery cbQuery)
@@ -351,6 +388,16 @@ namespace ComputerTNB_ClassMgr_Bot
             try
             {
                 long chatID = message.Chat.Id;
+
+                // FIRST, CHECK IF THE MESSAGE IS A TEXT AND IS A MACRO COMMAND.
+                if(message.Text != null)
+                {
+                    if(await Process_MACROCMD_Text_Async(chatID, message.Text, message))
+                    {
+                        // Command was MACRO, don't continue processing.
+                        return;
+                    }
+                }
 
                 // Check role of user.
                 var role = await Program.db.SQL_GetUserRole(chatID);
