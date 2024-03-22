@@ -8,6 +8,7 @@ using Mysqlx.Notice;
 using OpenCvSharp;
 using OpenCvSharp.Face;
 using Telegram.Bot.Types.InlineQueryResults;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace ComputerTNB_ClassMgr_Bot
 {
@@ -151,8 +152,10 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     model.Predict(faceROI, out int label, out double confidence);
 
+                    // Generate cropped image.
+                    Mat faceImg = new Mat(frame, face);
                     MemoryStream memoryStream = new MemoryStream();
-                    var bmp = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(faceROI);
+                    var bmp = OpenCvSharp.Extensions.BitmapConverter.ToBitmap(faceImg);
                     bmp.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
 
                     result.Add(
@@ -188,6 +191,21 @@ namespace ComputerTNB_ClassMgr_Bot
             bmp.Save(finalFilePath + fileExtension, System.Drawing.Imaging.ImageFormat.Png);
 
             return finalFilePath;
+        }
+
+        /// <summary>
+        /// Updates AI Image Processor model with a new <see cref="Mat"/> and the tag associated with it.
+        /// </summary>
+        /// <param name="faceImgFilePath">The path to face image file.</param>
+        /// <param name="label">The label of face. (AI_ModelIndex)</param>
+        /// <returns>This task returns nothing.</returns>
+        public async Task AI_UpdateDataset(string faceImgFilePath, int label)
+        {
+            await Task.Run(() =>
+            {
+                model.Update(new List<Mat> { new Mat(faceImgFilePath, ImreadModes.Grayscale) },
+                new List<int> { label });
+            });
         }
 
         #endregion

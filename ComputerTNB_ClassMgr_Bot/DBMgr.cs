@@ -55,6 +55,7 @@ namespace ComputerTNB_ClassMgr_Bot
             Teacher_Viewing_Lessons,
 
             Teacher_Checking_Lesson_Attendence,
+            Teacher_Identifying_Student_Picture,
         }
 
         #endregion
@@ -895,10 +896,10 @@ namespace ComputerTNB_ClassMgr_Bot
 
                     string commandText = string.Empty;
                     if (ai_PersonModelIndex != null)
-                        commandText = "SELECT * FROM images " +
-                            "WHERE PresentationCode = @AI_MODEL_INDEX";
+                        commandText = "SELECT * FROM faces " +
+                            "WHERE AI_ModelIndex = @AI_MODEL_INDEX";
                     else
-                        commandText = "SELECT * FROM images";
+                        commandText = "SELECT * FROM faces";
 
                     MySqlCommand command =
                         new MySqlCommand(commandText, connection);
@@ -986,7 +987,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 // Create directory.
                 Directory.CreateDirectory(directory);
 
-                // Create new unique file. (+ EXTENSION?)
+                // Create new unique file.
                 FileStream fstream = new FileStream(
                     Path.Combine(new string[] { directory, fileName }), FileMode.Create, FileAccess.ReadWrite
                     );
@@ -1010,6 +1011,102 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 return new DBResult()
                 { success = false, result = null, exception = ex };
+            }
+        }
+
+        /// <summary>
+        /// Registers a RAW Student record in database, for them to join the bot later. (Called probably before registering a new face of an unknown student...)
+        /// </summary>
+        /// <param name="chatID">New unique ChatID to designate to the student.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure, which its result contains newly created <see cref="Student"/> object.</returns>
+        public async Task<DBResult> SQL_RegisterStudentRaw(long chatID)
+        {
+            try
+            {
+                // Check if student previously existed.
+                var userRole = await SQL_GetUserRole(chatID);
+                if(userRole == User_Roles.Student)
+                {
+                    // User already exists, return query result.
+                    var oldStudentQuery = await SQL_GetStudent(chatID);
+                    return oldStudentQuery;
+                }
+
+                DateTime now = DateTime.Now;
+
+                var regStudent_Query = await SQL_ExecuteWrite(
+                    $"INSERT INTO students(ChatID, JoinDate, LastActivity) VALUES (" +
+                    $"{chatID}, \'{Convert_FromDateTime_ToSQLString(now)}\', \'{Convert_FromDateTime_ToSQLString(now)}\'" +
+                    $");"
+                    );
+                if (regStudent_Query.exception != null)
+                    throw regStudent_Query.exception;
+
+                // Re-Fetch the newly created student.
+                var fetchStudent_Query = await SQL_GetStudent(chatID);
+                if (fetchStudent_Query.exception != null)
+                    throw fetchStudent_Query.exception;
+                if (fetchStudent_Query.result == null)
+                    throw new NullReferenceException();
+
+                return new DBResult()
+                {
+                    result = (Student)fetchStudent_Query.result,
+                    exception = null,
+                    success = true,
+                };
+            }
+            catch(Exception ex)
+            {
+                return new DBResult()
+                {
+                    result = null,
+                    exception = ex,
+                    success = false,
+                };
+            }
+        }
+
+        public async Task<DBResult> SQL_RegisterFacePhoto(TelegramBotClient botClient,Telegram.Bot.Types.PhotoSize facePhoto,int ai_ModelIndex)
+        {
+            try
+            {
+                var downloadQuery = await FILE_Photo_SubmitToDirectory(botClient, facePhoto, "faces");
+                if (downloadQuery.exception != null)
+                    throw downloadQuery.exception;
+                if (downloadQuery.result == null)
+                    throw new NullReferenceException();
+
+                var downloadedFacePhotoPath = (string)downloadQuery.result;
+                // downloadedFacePhotoPath.Replace("\\", "\\\\");
+                var sqlFacePhotoPath = downloadedFacePhotoPath.Replace(@"\", @"\\");
+
+                var submitQuery = await SQL_ExecuteWrite(
+                    $"INSERT INTO faces VALUES(" +
+                    $"{ai_ModelIndex}, \'{sqlFacePhotoPath}\'" +
+                    $");"
+                    );
+                if (submitQuery.exception != null)
+                    throw submitQuery.exception;
+
+                // Update AI Model Dataset with the newely registered face.
+                await Program.ai.AI_UpdateDataset(downloadedFacePhotoPath, ai_ModelIndex);
+
+                return new DBResult()
+                {
+                    exception = null,
+                    result = downloadedFacePhotoPath,
+                    success = true,
+                };
+            }
+            catch(Exception ex)
+            {
+                return new DBResult()
+                {
+                    exception = ex,
+                    result = null,
+                    success = false,
+                };
             }
         }
     }

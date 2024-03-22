@@ -195,6 +195,7 @@ namespace ComputerTNB_ClassMgr_Bot
             if (botClient == null)
                 throw new NullReferenceException();
 
+            // TODO: Implement exception handlers.
             if (cbQuery.Data != null)
             {
                 var datas = cbQuery.Data.Split('~');
@@ -225,10 +226,52 @@ namespace ComputerTNB_ClassMgr_Bot
                         }
                         else
                         {
-
+                            // TODO: List students.
                         }
                     }
                     catch (Exception ex)
+                    {
+
+                    }
+                }
+
+                // Identify student picture.
+                else if (datas[0] == "IDENTIFY_STUD_PIC")
+                {
+                    try
+                    {
+                        var teacher_ChatID = Convert.ToInt64(datas[1]);
+                        var msg = cbQuery.Message;
+
+                        if (msg == null)
+                            throw new ArgumentNullException();
+                        if (msg.Photo == null)
+                            throw new ArgumentNullException();
+
+                        PhotoSize? bestPhoto = msg.Photo[0];
+                        foreach (var photo in msg.Photo)
+                            if (photo.FileSize > bestPhoto.FileSize)
+                                bestPhoto = photo;
+
+                        // Re-Send photo with a ForceReplyMarkup.
+                        await botClient.SendPhotoAsync(
+                            teacher_ChatID, InputFile.FromFileId(bestPhoto.FileId),
+                            null, "👇 شماره نشست کاربری این دانشجو را وارد نمایید:\n\n❔ <i>در صورتی که دانشجو شماره نشست کاربری خود را نمی داند، با ارسال دستور /getid به تنهایی به این بات، می تواند شماره نشست کاربری خود را دریافت و به شما اعلام کند.</i>", null, null, false, false, true, msg.MessageId, false,
+                            new ForceReplyMarkup()
+                            );
+
+                        // Update teacher status.
+                        await Program.db.SQL_ExecuteWrite($"UPDATE teachers " +
+                            $"SET State = " +
+                            $"{(uint)DBMgr.User_States.Teacher_Identifying_Student_Picture} " +
+                            $"WHERE ChatID = {teacher.chatID}");
+
+                        Logging.Log_Information(
+                                $"Identifying student picture for Teacher with ChatID= \'{teacher.chatID}\'",
+                                $"Process_CallbackQuery_Teacher_Async({teacher.chatID}, {cbQuery.Id}) -> IDENTIFY_STUD_PIC"
+                                );
+                    }
+                    catch(Exception ex)
                     {
 
                     }
@@ -287,6 +330,9 @@ namespace ComputerTNB_ClassMgr_Bot
                                 null, Telegram.Bot.Types.Enums.ParseMode.Html, null,
                                 false, false, true, null, true, new ReplyKeyboardMarkup(keyboardButtons_BeginImgProc)
                                 );
+
+                            Logging.Log_Warning($"Ready to check attendence for lesson with PresentationCode= \'{lesson.presentationCode}\'.",
+                                $"Process_CallbackQuery_Teacher_Async({teacher.chatID}, {cbQuery.Id}) -> ATTENDENCE_AI");
                         }
                     }
                     catch(Exception ex)
@@ -484,6 +530,54 @@ namespace ComputerTNB_ClassMgr_Bot
                         }
 
                         break;
+
+                    case (uint)DBMgr.User_States.Teacher_Identifying_Student_Picture:
+
+                        if(message.ReplyToMessage == null)
+                        {
+                            await botClient.SendTextMessageAsync(
+                                teacher.chatID,
+                                "⛔ هنگام وارد کردن شماره کاربری تصویر دانشجو جدید، باید حتما در حالت Reply بر روی تصویر دانشجو باشید.\n\n👈 <i>برای لغو عملیات، از /cancel استفاده کنید.</i>",
+                                null, Telegram.Bot.Types.Enums.ParseMode.Html,
+                                null, null, false, true, message.MessageId,
+                                false, new ReplyKeyboardRemove()
+                                );
+                            Logging.Log_Error("Teacher must reply on student's picture in order for the system to identify them!", $"Process_Message_Text({teacher.chatID})->IDENTIFY_STUD_PIC");
+                            break;
+                        }
+
+                        // Get the photo of the replied message.
+                        if(message.ReplyToMessage.Photo == null)
+                        {
+                            await botClient.SendTextMessageAsync(
+                                teacher.chatID, "⛔ هنگام وارد کردن شماره کاربری تصویر دانشجو جدید، باید حتما در حالت Reply بر روی تصویر دانشجو باشید.\n\n👈 <i>برای لغو عملیات، از /cancel استفاده کنید.</i>"
+                                );
+                            Logging.Log_Error("Teacher must reply on student's picture in order for the system to identify them!", $"Process_Message_Text({teacher.chatID})->IDENTIFY_STUD_PIC");
+                            break;
+                        }
+                        PhotoSize? bestPhoto = message.ReplyToMessage.Photo[0];
+                        foreach (var photo in message.ReplyToMessage.Photo)
+                        {
+                            if (photo.FileSize > bestPhoto.FileSize)
+                                bestPhoto = photo;
+                        }
+
+                        // Register new user with raw values.
+                        var regQuery = await Program.db.SQL_RegisterStudentRaw(Convert.ToInt64(msg_Text));
+                        if (regQuery.exception != null)
+                            throw regQuery.exception;
+                        if (regQuery.result == null)
+                            throw new NullReferenceException();
+                        var regStudent = (Student)regQuery.result;
+
+                        // Register face to both database and AI model!
+                        var registerQuery = await Program.db.SQL_RegisterFacePhoto(botClient, bestPhoto, regStudent.ai_ModelIndex);
+                        if (registerQuery.exception != null)
+                            throw registerQuery.exception;
+
+                        Logging.Log_Information($"Identified student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {regStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
+
+                        break;
                 }
 
             }
@@ -509,6 +603,8 @@ namespace ComputerTNB_ClassMgr_Bot
                         // Send "Loading..." emoji.
                         var msg = await botClient.SendTextMessageAsync(teacher.chatID, "⌛");
 
+                        Logging.Log_Information("AI -> Processing input image for face recognition...", $"Process_Image_Teacher_Async({teacher.chatID}) -> CHECK STUDENT ATTENDENCE");
+
                         // Download the photo of the students in the class.
                         var download_Query = await Program.db.FILE_Photo_SubmitToDirectory(botClient, bestQualityPhoto);
                         if (download_Query.exception != null)
@@ -516,20 +612,28 @@ namespace ComputerTNB_ClassMgr_Bot
                         if (download_Query.result == null)
                             throw new NullReferenceException();
 
+                        Logging.Log_Information($"DB -> Submitted processed file to local database directory from server: \'{(string)download_Query.result}\'", $"Process_Image_Teacher_Async({teacher.chatID}) -> CHECK STUDENT ATTENDENCE");
+
                         // Send this to AI model for face recognition.
                         var photoFilePath = (string)download_Query.result;
                         var photoFileExtension = Path.GetExtension(photoFilePath);
                         var faces = Program.ai.AI_DetectAndTagFaces(photoFilePath, out OpenCvSharp.Mat rendered);
 
+                        Logging.Log_Information($"AI -> Tagged faces in image: \'{photoFilePath}\'", $"Process_Image_Teacher_Async({teacher.chatID}) -> CHECK STUDENT ATTENDENCE");
+
                         // Save rendered picture to local TEMP directory.
                         var finalPath = AI_ImgProc.Mat_Save_Temp(rendered, photoFileExtension);
 
+                        Logging.Log_Information($"AI -> Uploading TEMP render result: \'{finalPath}\'", $"Process_Image_Teacher_Async({teacher.chatID}) -> CHECK STUDENT ATTENDENCE");
+
                         // Upload render result after temp save.
-                        using(FileStream fs = new FileStream(finalPath, FileMode.Open))
+                        using (FileStream fs = new FileStream(finalPath, FileMode.Open))
                         {
                             var photo = InputFile.FromStream(fs, Path.GetFileName(photoFilePath));
                             await botClient.SendPhotoAsync(teacher.chatID, photo);
                         }
+
+                        Logging.Log_Information($"AI -> FINISHED IMAGE PROCESSING", $"Process_Image_Teacher_Async({teacher.chatID}) -> CHECK STUDENT ATTENDENCE");
 
                         // Delete Loading msg.
                         await Bot_DeleteMessageWithNoError_Async(teacher.chatID, msg.MessageId);
@@ -858,8 +962,12 @@ namespace ComputerTNB_ClassMgr_Bot
             if (Program.db == null || botClient == null)
                 throw new NullReferenceException();
 
-            foreach(var face in faces)
+            Logging.Log_Information($"AI -> FINISHED IMAGE PROCESSING", $"Prompt_Teacher_FaceBubbles({teacher.chatID})");
+
+            foreach (var face in faces)
             {
+                Logging.Log_Information($"Fetching student with AI_ModelIndex:  \'{face.Value}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
                 var findStudent_Query = await Program.db.SQL_GetStudent_ByAIModelIndex(face.Value);
                 if (findStudent_Query.exception != null)
                     throw findStudent_Query.exception;
@@ -871,6 +979,8 @@ namespace ComputerTNB_ClassMgr_Bot
 
                 if (findStudent == null)
                 {
+                    Logging.Log_Information($"UNKNOWN student with AI_ModelIndex:  \'{face.Value}\'. Asking the user to identify them.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
                     captionText = $"🖼 هویت چهره تشخیص داده شده نامعین است. ❔\n\n" +
                         $"👇 لطفاً از کلیدهای ذیل، اقدام به شناساندن تصویر به سامانه فرمایید:";
 
@@ -879,22 +989,38 @@ namespace ComputerTNB_ClassMgr_Bot
                 }
                 else
                 {
+                    Logging.Log_Information($"IDENTIFIED student with AI_ModelIndex:  \'{face.Value}\'. -> Student_ChatID=  \'{findStudent.chatID}\'.");
+
                     captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{findStudent.chatID}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
 
-                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<ulong>($"SELECT COUNT(*) FROM attends " +
+                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM attends " +
                         $"WHERE Student_ChatID= {findStudent.chatID} and " +
                         $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
                         $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
                     if (isStudentAlreadyAttended_Query.result == null)
+                    {
+                        /*Console.WriteLine("\n\nNULLLLLLLLLLL\n\n");*/
                         throw new NullReferenceException();
-                    bool isStudentAlreadyAttended = (ulong)isStudentAlreadyAttended_Query.result != 0;
+                    }
+                    bool isStudentAlreadyAttended = (long)isStudentAlreadyAttended_Query.result != 0;
 
                     if (!isStudentAlreadyAttended)
+                    {
+                        Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
                         inlineKeyboardButtons_FaceRecognition.Add(new()
                         { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}") });
+                    }
                     else
+                    {
+                        Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has attended Lesson \'{teacher.__meta}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
                         inlineKeyboardButtons_FaceRecognition.Add(new()
                         { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.chatID}") });
+                    }
+
+                    inlineKeyboardButtons_FaceRecognition.Add(new()
+                    { InlineKeyboardButton.WithCallbackData("⚠ اعلام مغایرت مشخصات تشخیص داده شده", $"IDENTIFY_STUD_PIC~{teacher.chatID}") });
                 }
 
                 inlineKeyboardButtons_FaceRecognition.Add(new()
