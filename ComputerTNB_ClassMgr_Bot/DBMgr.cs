@@ -538,7 +538,7 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
-        public static string Convert_FromDateTime_ToSQLString(DateTime dateTime)
+        public static string Convert_FromDateTime_ToSQLDateTimeString(DateTime dateTime)
         {
             return
                 $"{dateTime.Year:0000}-{dateTime.Month:00}-{dateTime.Day:00} " +
@@ -587,6 +587,48 @@ namespace ComputerTNB_ClassMgr_Bot
             return
                 $"{nameOfDay}، {pc.GetDayOfMonth(dateTime):00} {nameOfMonth} {pc.GetYear(dateTime):0000} - " +
                 $"ساعت {pc.GetHour(dateTime):00}:{pc.GetMinute(dateTime)}:{pc.GetSecond(dateTime):00}";
+        }
+
+        public static string Convert_FromDateTime_ToPersianDateString(DateTime dateTime)
+        {
+            PersianCalendar pc = new PersianCalendar();
+
+            string nameOfDay = string.Empty;
+            string nameOfMonth = string.Empty;
+
+            var dayOfWeek = pc.GetDayOfWeek(dateTime);
+            switch (dayOfWeek)
+            {
+                case DayOfWeek.Saturday: nameOfDay = "شنبه"; break;
+                case DayOfWeek.Sunday: nameOfDay = "یکشنبه"; break;
+                case DayOfWeek.Monday: nameOfDay = "دوشنبه"; break;
+                case DayOfWeek.Tuesday: nameOfDay = "سه‌شنبه"; break;
+                case DayOfWeek.Wednesday: nameOfDay = "چهارشنبه"; break;
+                case DayOfWeek.Thursday: nameOfDay = "پنجشنبه"; break;
+                case DayOfWeek.Friday: nameOfDay = "جمعه"; break;
+            }
+
+            var monthInYear = pc.GetMonth(dateTime);
+            switch (monthInYear)
+            {
+                case 1: nameOfMonth = "فروردین"; break;
+                case 2: nameOfMonth = "اردیبهشت"; break;
+                case 3: nameOfMonth = "خرداد"; break;
+
+                case 4: nameOfMonth = "تیر"; break;
+                case 5: nameOfMonth = "مرداد"; break;
+                case 6: nameOfMonth = "شهریور"; break;
+
+                case 7: nameOfMonth = "مهر"; break;
+                case 8: nameOfMonth = "آبان"; break;
+                case 9: nameOfMonth = "آذر"; break;
+
+                case 10: nameOfMonth = "دی"; break;
+                case 11: nameOfMonth = "بهمن"; break;
+                case 12: nameOfMonth = "اسفند"; break;
+            }
+
+            return $"{nameOfDay}، {pc.GetDayOfMonth(dateTime):00} {nameOfMonth}";
         }
 
         /// <summary>
@@ -899,7 +941,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         commandText = "SELECT * FROM faces " +
                             "WHERE AI_ModelIndex = @AI_MODEL_INDEX";
                     else
-                        commandText = "SELECT * FROM faces";
+                        commandText = "SELECT * FROM faces;";
 
                     MySqlCommand command =
                         new MySqlCommand(commandText, connection);
@@ -911,7 +953,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     reader.ConfigureAwait(false);
 
                     List<AI_ImageIndex> imageIndices = new List<AI_ImageIndex>();
-                    if (await reader.ReadAsync())
+                    while (await reader.ReadAsync())
                     {
                         AI_ImageIndex imgIdx = new AI_ImageIndex()
                         {
@@ -1036,7 +1078,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                 var regStudent_Query = await SQL_ExecuteWrite(
                     $"INSERT INTO students(ChatID, JoinDate, LastActivity) VALUES (" +
-                    $"{chatID}, \'{Convert_FromDateTime_ToSQLString(now)}\', \'{Convert_FromDateTime_ToSQLString(now)}\'" +
+                    $"{chatID}, \'{Convert_FromDateTime_ToSQLDateTimeString(now)}\', \'{Convert_FromDateTime_ToSQLDateTimeString(now)}\'" +
                     $");"
                     );
                 if (regStudent_Query.exception != null)
@@ -1107,6 +1149,109 @@ namespace ComputerTNB_ClassMgr_Bot
                     result = null,
                     success = false,
                 };
+            }
+        }
+
+        /// <summary>
+        /// Gets the <see cref="Student"/> attendence info and stores it in a <see cref="Student_Attend"/> structure.
+        /// </summary>
+        /// <param name="studentChatID">Student's unique ChatID.</param>
+        /// <param name="lesson_PresentationCode">The presentation code of the lesson that the student attended.</param>
+        /// <param name="dateAttended">Date of attendence.</param>
+        /// <param name="submittedBy_ChatID">Who submits this record.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure, which its result contains the <see cref="Student_Attend"/>.</returns>
+        public async Task<DBResult> SQL_GetStudentAttendence(long studentChatID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM students_attens " +
+                        "WHERE Student_ChatID = @STUDENT_CHATID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("STUDENT_CHATID", studentChatID);
+                    command.Parameters.AddWithValue("LESSON_PRESENTCODE", lesson_PresentationCode);
+                    command.Parameters.AddWithValue("DATE_ATTENDED", Convert_FromDateTime_ToSQLDateString(dateAttended));
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    Student_Attend? studentAttend = null;
+                    if (await reader.ReadAsync())
+                    {
+                        studentAttend = new()
+                        {
+                            student_ChatID = (long)reader["Student_ChatID"],
+                            lesson_PresentationCode = (string)reader["Lesson_PresentationCode"],
+                            date_Attended = Convert_FromSQLDateString_ToDateTime((string)reader["Date_Attended"]),
+                            submittedBy_ChatID = (long)reader["SubmittedBy_ChatID"],
+                        };
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = studentAttend,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+
+        public async Task<DBResult> SQL_NewStudentAttendence(long studentChatID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
+        {
+            try
+            {
+                // Check if an attendence already existed...
+                var studAttend_Query = await SQL_GetStudentAttendence(studentChatID, lesson_PresentationCode, dateAttended, submittedBy_ChatID);
+
+                // If an already student attendence exists, do not create a new one and return it as the result.
+                if (studAttend_Query.result != null)
+                    return studAttend_Query;
+
+                // Otherwise, create the new attendence record.
+                var studAttend_WriteQuery = await SQL_ExecuteWrite(
+                    $"INSERT INTO students_attends VALUES" +
+                    $"({studentChatID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
+                    );
+
+                // If an exception occured, throw it.
+                if (studAttend_WriteQuery.exception != null)
+                    throw studAttend_WriteQuery.exception;
+
+                // Create the Student_Attendence model and return it as the result.
+                Student_Attend studAttend = new()
+                {
+                    student_ChatID = studentChatID,
+                    lesson_PresentationCode = lesson_PresentationCode,
+                    date_Attended = dateAttended,
+                    submittedBy_ChatID = submittedBy_ChatID,
+                };
+
+                return new DBResult()
+                {
+                    success = true,
+                    exception = null,
+                    result = studAttend,
+                };
+            }
+            catch(Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
             }
         }
     }

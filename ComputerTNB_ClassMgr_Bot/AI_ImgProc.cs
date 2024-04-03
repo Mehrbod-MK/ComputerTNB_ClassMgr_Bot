@@ -91,7 +91,7 @@ namespace ComputerTNB_ClassMgr_Bot
             Logging.Log_Information("END -> Load default faces dataset.", "AI_IMG_PROC -> DEFAULT DATASET");
 
             Logging.Log_Information("Fetching image indices for AI model training...", "AI_IMGPROC -> BeginTrain()");
-            var imagePaths_Query = await Program.db.SQL_Get_ListOfImagesPaths();
+            var imagePaths_Query = await Program.db.SQL_Get_ListOfImagesPaths(null);
             if (imagePaths_Query.exception != null)
                 throw imagePaths_Query.exception;
             else if (imagePaths_Query.result == null)

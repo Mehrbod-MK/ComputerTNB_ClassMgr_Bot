@@ -9,6 +9,7 @@ namespace ComputerTNB_ClassMgr_Bot
         // TODO: Always check!
         #region PROGRAM_CONSTANTS
 
+        // Ignore date & time checking for teacher manipulating lesson's attendence.
         public static bool _IGNORE_TEACHER_LESSON_CHECKCLASSTIME = true;
 
         #endregion

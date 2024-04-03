@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace ComputerTNB_ClassMgr_Bot
@@ -235,6 +236,15 @@ namespace ComputerTNB_ClassMgr_Bot
             // TODO: Implement exception handlers.
             if (cbQuery.Data != null)
             {
+                // Check if the message this query is attached to is valid...
+                if(cbQuery.Message == null)
+                {
+                    await botClient.AnswerCallbackQueryAsync(cbQuery.Id, "❌ پیام نامعتبر می‌باشد.",
+                        true);
+
+                    return;
+                }
+
                 var datas = cbQuery.Data.Split('~');
 
                 // Get the list of students (LIST_STUD~{PresentationCode})
@@ -277,6 +287,11 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     try
                     {
+                        // Answer callback query.
+                        await botClient.AnswerCallbackQueryAsync(cbQuery.Id,
+                            "🖼 جهت شناسایی تصویر دانشجو، شماره نشست کابری ایشان را وارد کنید.", false,
+                            null, 7);
+
                         var teacher_ChatID = Convert.ToInt64(datas[1]);
                         var msg = cbQuery.Message;
 
@@ -293,7 +308,9 @@ namespace ComputerTNB_ClassMgr_Bot
                         // Re-Send photo with a ForceReplyMarkup.
                         await botClient.SendPhotoAsync(
                             teacher_ChatID, InputFile.FromFileId(bestPhoto.FileId),
-                            null, "👇 شماره نشست کاربری این دانشجو را وارد نمایید:\n\n❔ <i>در صورتی که دانشجو شماره نشست کاربری خود را نمی داند، با ارسال دستور /getid به تنهایی به این بات، می تواند شماره نشست کاربری خود را دریافت و به شما اعلام کند.</i>", null, null, false, false, true, msg.MessageId, false,
+                            null, "👇 شماره نشست کاربری این دانشجو را وارد نمایید:\n\n❔ <i>در صورتی که دانشجو شماره نشست کاربری خود را نمی داند، با ارسال دستور /getid به تنهایی به این بات، می تواند شماره نشست کاربری خود را دریافت و به شما اعلام کند.</i>", 
+                            ParseMode.Html, null, false, false, 
+                            true, msg.MessageId, false,
                             new ForceReplyMarkup()
                             );
 
@@ -375,6 +392,82 @@ namespace ComputerTNB_ClassMgr_Bot
                     catch(Exception ex)
                     {
                         
+                    }
+                }
+
+                // Accept student attendence.
+                else if (datas[0] == "ACCEPT_STUD_ATTEND")
+                {
+                    try
+                    {
+                        long student_ChatID = Convert.ToInt64(datas[1]);
+                        long teacher_ChatID = cbQuery.Message.Chat.Id;
+                        string lesson_PresentCode = datas[2];
+
+                        // Get teacher infos.
+                        var teacherQuery = await Program.db.SQL_GetTeacher(teacher_ChatID);
+                        if(teacherQuery.result == null)
+                        {
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id, $"❌ نشست کاربری استاد {teacher_ChatID} معتبر نمی‌باشد.",
+                                true
+                                );
+
+                            return;
+                        }
+
+                        // Check student validity.
+                        var studentQuery = await Program.db.SQL_GetStudent(student_ChatID);
+                        if(studentQuery.result == null)
+                        {
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id, $"❌ نشست کاربری دانشجو {student_ChatID} معتبر نمی‌باشد.",
+                                true
+                                );
+
+                            return;
+                        }
+                        Student student = (Student)studentQuery.result;
+
+                        // Check lesson validity.
+                        var lessonQuery = await Program.db.SQL_GetLesson(lesson_PresentCode);
+                        if(lessonQuery.result == null)
+                        {
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id, $"❌ کد ارائه درس {lesson_PresentCode} معتبر نمی‌باشد.",
+                                true
+                                );
+
+                            return;
+                        }
+                        Lesson lesson = (Lesson)lessonQuery.result;
+
+                        // Accept attendence!
+                        var dateTimeNow = DateTime.Now;
+                        var attendenceQuery = await Program.db.SQL_NewStudentAttendence(
+                            student_ChatID, lesson_PresentCode, dateTimeNow, teacher_ChatID
+                            );
+                        if (attendenceQuery.exception != null)
+                            throw attendenceQuery.exception;
+                        else if (attendenceQuery.result == null)
+                            throw new NullReferenceException();
+
+                        // Inform teacher.
+                        await botClient.AnswerCallbackQueryAsync(
+                            cbQuery.Id,
+                            $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.chatID})\n" +
+                            $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
+                            $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
+                            $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
+                            $"با موفقیت تأیید گردید."
+                            );
+
+                        // Delete message.
+                        await botClient.DeleteMessageAsync(teacher.chatID, cbQuery.Message.MessageId);
+                    }
+                    catch(Exception ex)
+                    {
+
                     }
                 }
             }
@@ -504,7 +597,7 @@ namespace ComputerTNB_ClassMgr_Bot
             // UPDATE DATABASE VALUES.
             var updateLastActivity_Query = await Program.db.SQL_ExecuteWrite(
                 "UPDATE teachers " +
-                $"SET LastActivity = \'{DBMgr.Convert_FromDateTime_ToSQLString(DateTime.Now)}\' " +
+                $"SET LastActivity = \'{DBMgr.Convert_FromDateTime_ToSQLDateTimeString(DateTime.Now)}\' " +
                 $"WHERE ChatID = \'{chatID}\'"
                 );
 
@@ -623,6 +716,15 @@ namespace ComputerTNB_ClassMgr_Bot
                             throw registerQuery.exception;
 
                         Logging.Log_Information($"Identified student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {regStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
+
+                        // Also, mark student as attended!
+                        
+
+                        // Update teacher status. (-> BACK TO Checking lesson attendence.)
+                        await Program.db.SQL_ExecuteWrite($"UPDATE teachers " +
+                            $"SET State = " +
+                            $"{(uint)DBMgr.User_States.Teacher_Checking_Lesson_Attendence} " +
+                            $"WHERE ChatID = {teacher.chatID}");
 
                         break;
                 }
@@ -1040,7 +1142,7 @@ namespace ComputerTNB_ClassMgr_Bot
 
                     captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{findStudent.chatID}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
 
-                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM attends " +
+                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM students_attends " +
                         $"WHERE Student_ChatID= {findStudent.chatID} and " +
                         $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
                         $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
@@ -1056,7 +1158,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
 
                         inlineKeyboardButtons_FaceRecognition.Add(new()
-                        { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}") });
+                        { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}~{teacher.__meta}") });
                     }
                     else
                     {
@@ -1067,7 +1169,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     }
 
                     inlineKeyboardButtons_FaceRecognition.Add(new()
-                    { InlineKeyboardButton.WithCallbackData("⚠ اعلام مغایرت مشخصات تشخیص داده شده", $"IDENTIFY_STUD_PIC~{teacher.chatID}") });
+                    { InlineKeyboardButton.WithCallbackData("⚠ اعلام مغایرت مشخصات تشخیص داده شده", $"EDIT_STUD_PIC~{teacher.chatID}") });
                 }
 
                 inlineKeyboardButtons_FaceRecognition.Add(new()
