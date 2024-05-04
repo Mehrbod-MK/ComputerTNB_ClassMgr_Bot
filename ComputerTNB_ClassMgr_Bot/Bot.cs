@@ -122,14 +122,16 @@ namespace ComputerTNB_ClassMgr_Bot
                             // Update is a message object.
                             case Telegram.Bot.Types.Enums.UpdateType.Message:
                                 if (update.Message != null)
-                                    await Process_Message_Async(update.Message);
+                                    // await Process_Message_Async(update.Message);
+                                    _ = Process_Message_Async(update.Message);
                                 break;
 
                             // Update is a CallbackQuery.
                             case Telegram.Bot.Types.Enums.UpdateType.CallbackQuery:
                                 if (update.CallbackQuery != null)
                                 {
-                                    await Process_CallbackQuery_Async(update.CallbackQuery);
+                                    // await Process_CallbackQuery_Async(update.CallbackQuery);
+                                    _ = Process_CallbackQuery_Async(update.CallbackQuery);
                                 }
                                 break;
                         }
