@@ -461,7 +461,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
                             $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
                             $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
-                            $"با موفقیت تأیید گردید."
+                            $"با موفقیت تأیید گردید.", true
                             );
 
                         // Delete message.
