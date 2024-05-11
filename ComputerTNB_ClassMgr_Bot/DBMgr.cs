@@ -193,6 +193,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         student = new Student()
                         {
                             chatID = (long)reader["ChatID"],
+                            guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
                             lastName = ConvertFromDBVal<string?>(reader["LastName"]),
@@ -218,6 +219,68 @@ namespace ComputerTNB_ClassMgr_Bot
                 }
             }
             catch(Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
+        /// <summary>
+        /// This method retrieves a Student object from students' table, providing its GUID.
+        /// </summary>
+        /// <param name="guid">Unique Index:  GUID.</param>
+        /// <returns>This task returns a DBResult structure.</returns>
+        public async Task<DBResult> SQL_GetStudent(string guid)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM students " +
+                        "WHERE GUID = @GUID";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("GUID", guid);
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    Student? student = null;
+                    if (await reader.ReadAsync())
+                    {
+                        student = new Student()
+                        {
+                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            guid = ConvertFromDBVal<string?>(reader["GUID"]),
+                            email = ConvertFromDBVal<string?>(reader["Email"]),
+                            firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
+                            lastName = ConvertFromDBVal<string?>(reader["LastName"]),
+                            joinedDate = (DateTime)reader["JoinDate"],
+                            lastActivity = (DateTime)reader["LastActivity"],
+                            phoneNumber = ConvertFromDBVal<string?>(reader["PhoneNumber"]),
+                            studentId = ConvertFromDBVal<string?>(reader["StudentID"]),
+
+                            state = (uint)reader["State"],
+
+                            ai_ModelIndex = (int)reader["AI_ModelIndex"],
+                        };
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = student,
+                    };
+                }
+            }
+            catch (Exception ex)
             {
                 return new DBResult()
                 { exception = ex, result = null, success = false };
@@ -250,6 +313,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         student = new Student()
                         {
                             chatID = (long)reader["ChatID"],
+                            guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
                             lastName = ConvertFromDBVal<string?>(reader["LastName"]),
@@ -1108,6 +1172,64 @@ namespace ComputerTNB_ClassMgr_Bot
                 };
             }
         }
+        /// <summary>
+        /// Registers a RAW Student BLINDLY (WITHOUT CHAT_ID) record in database, for them to join the bot later. (Called probably before registering a new face of an unknown student...)
+        /// </summary>
+        /// <param name="fullName">Student's full name.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure, which its result contains newly created <see cref="Student"/> object.</returns>
+        public async Task<DBResult> SQL_RegisterStudentRaw(string fullName)
+        {
+            try
+            {
+                DateTime now = DateTime.Now;
+                string guid = _GET_GUID();
+                var names = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                string firstName = "NULL", lastName = "NULL";
+                if (names.Length >= 1)
+                    firstName = $"\'{names[0]}\'";
+                if (names.Length >= 2)
+                    lastName = $"\'{names[1]}\'";
+
+                string queryText = $"INSERT INTO students(GUID, FirstName, LastName, JoinDate, LastActivity) VALUES (" +
+                    $"\'{guid}\', {firstName}, {lastName}, " +
+                    $"\'{Convert_FromDateTime_ToSQLDateTimeString(now)}\', " +
+                    $"\'{Convert_FromDateTime_ToSQLDateTimeString(now)}\'" +
+                    $");";
+
+                var regStudent_Query = await SQL_ExecuteWrite(
+                    queryText
+                    );
+                if (regStudent_Query.exception != null)
+                    throw regStudent_Query.exception;
+                else if (regStudent_Query.result == null)
+                    throw new NullReferenceException();
+                /*Console.WriteLine("ROWS AFFECTED:   " + regStudent_Query.result.ToString());
+                Console.WriteLine("QUERY:  " + queryText);*/
+
+                // Re-Fetch the newly created student.
+                var fetchStudent_Query = await SQL_GetStudent(guid);
+                if (fetchStudent_Query.exception != null)
+                    throw fetchStudent_Query.exception;
+                if (fetchStudent_Query.result == null)
+                    throw new NullReferenceException();
+
+                return new DBResult()
+                {
+                    result = (Student)fetchStudent_Query.result,
+                    exception = null,
+                    success = true,
+                };
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                {
+                    result = null,
+                    exception = ex,
+                    success = false,
+                };
+            }
+        }
 
         public async Task<DBResult> SQL_RegisterFacePhoto(TelegramBotClient botClient,Telegram.Bot.Types.PhotoSize facePhoto,int ai_ModelIndex)
         {
@@ -1160,7 +1282,7 @@ namespace ComputerTNB_ClassMgr_Bot
         /// <param name="dateAttended">Date of attendence.</param>
         /// <param name="submittedBy_ChatID">Who submits this record.</param>
         /// <returns>This task returns a <see cref="DBResult"/> structure, which its result contains the <see cref="Student_Attend"/>.</returns>
-        public async Task<DBResult> SQL_GetStudentAttendence(long studentChatID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
+        public async Task<DBResult> SQL_GetStudentAttendence(long? studentChatID, string? studentGUID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
         {
             try
             {
@@ -1169,12 +1291,29 @@ namespace ComputerTNB_ClassMgr_Bot
                     connection.ConfigureAwait(false);
                     await connection.OpenAsync();
 
-                    string commandText = "SELECT * FROM students_attens " +
-                        "WHERE Student_ChatID = @STUDENT_CHATID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
+                    string str_StudentChatID = "NULL", str_StudentGUID = "NULL";
+                    if (studentChatID != null)
+                        str_StudentChatID = $"\'{studentChatID}\'";
+                    else if (studentGUID != null)
+                        str_StudentGUID = $"\'{studentGUID}\'";
+
+                    string commandText = "";
+                    if(studentChatID != null)
+                        commandText = "SELECT * FROM students_attens " +
+                            "WHERE Student_ChatID = @STUDENT_CHATID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
+                    else if(studentGUID != null)
+                        commandText = "SELECT * FROM students_attens " +
+                            "WHERE Student_GUID = @STUDENT_GUID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
 
                     MySqlCommand command =
                         new MySqlCommand(commandText, connection);
-                    command.Parameters.AddWithValue("STUDENT_CHATID", studentChatID);
+                    if (studentChatID != null)
+                        command.Parameters.AddWithValue("STUDENT_CHATID", str_StudentChatID);
+                    else if (studentGUID != null)
+                        command.Parameters.AddWithValue("STUDENT_GUID", str_StudentGUID);
+                    else
+                        throw new ArgumentNullException("Cannot locate attendence when Student's CHAT_ID nor GUID is provided...!");
+
                     command.Parameters.AddWithValue("LESSON_PRESENTCODE", lesson_PresentationCode);
                     command.Parameters.AddWithValue("DATE_ATTENDED", Convert_FromDateTime_ToSQLDateString(dateAttended));
                     command.ConfigureAwait(false);
@@ -1187,7 +1326,8 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         studentAttend = new()
                         {
-                            student_ChatID = (long)reader["Student_ChatID"],
+                            student_ChatID = ConvertFromDBVal<long>(reader["Student_ChatID"]),
+                            student_GUID = ConvertFromDBVal<string>(reader["Student_GUID"]),
                             lesson_PresentationCode = (string)reader["Lesson_PresentationCode"],
                             date_Attended = Convert_FromSQLDateString_ToDateTime((string)reader["Date_Attended"]),
                             submittedBy_ChatID = (long)reader["SubmittedBy_ChatID"],
@@ -1211,12 +1351,23 @@ namespace ComputerTNB_ClassMgr_Bot
             }
         }
 
-        public async Task<DBResult> SQL_NewStudentAttendence(long studentChatID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
+        public async Task<DBResult> SQL_NewStudentAttendence(long? studentChatID, string? studentGUID, string lesson_PresentationCode, DateTime dateAttended, long submittedBy_ChatID)
         {
             try
             {
+                // Create parameters for query.
+                string str_StudentChatID = "NULL", str_StudentGUID = "NULL";
+                if (studentChatID != null)
+                    str_StudentChatID = $"\'{studentChatID}\'";
+                else if (studentGUID != null)
+                    str_StudentGUID = $"\'{studentGUID}\'";
+
                 // Check if an attendence already existed...
-                var studAttend_Query = await SQL_GetStudentAttendence(studentChatID, lesson_PresentationCode, dateAttended, submittedBy_ChatID);
+                var studAttend_Query = await SQL_GetStudentAttendence(studentChatID, studentGUID, lesson_PresentationCode, dateAttended, submittedBy_ChatID);
+
+                // Check if any errors occured.
+                if (studAttend_Query.exception != null)
+                    throw studAttend_Query.exception;
 
                 // If an already student attendence exists, do not create a new one and return it as the result.
                 if (studAttend_Query.result != null)
@@ -1225,7 +1376,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 // Otherwise, create the new attendence record.
                 var studAttend_WriteQuery = await SQL_ExecuteWrite(
                     $"INSERT INTO students_attends VALUES" +
-                    $"({studentChatID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
+                    $"({str_StudentChatID}, {str_StudentGUID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
                     );
 
                 // If an exception occured, throw it.

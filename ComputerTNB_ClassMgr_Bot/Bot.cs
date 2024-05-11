@@ -291,7 +291,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         // Answer callback query.
                         await botClient.AnswerCallbackQueryAsync(cbQuery.Id,
-                            "🖼 جهت شناسایی تصویر دانشجو، شماره نشست کابری ایشان را وارد کنید.", false,
+                            "🖼 جهت شناسایی تصویر دانشجو، شماره نشست کابری یا نام و نام خانوادگی ایشان را وارد کنید.", false,
                             null, 7);
 
                         var teacher_ChatID = Convert.ToInt64(datas[1]);
@@ -310,7 +310,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         // Re-Send photo with a ForceReplyMarkup.
                         await botClient.SendPhotoAsync(
                             teacher_ChatID, InputFile.FromFileId(bestPhoto.FileId),
-                            null, "👇 شماره نشست کاربری این دانشجو را وارد نمایید:\n\n❔ <i>در صورتی که دانشجو شماره نشست کاربری خود را نمی داند، با ارسال دستور /getid به تنهایی به این بات، می تواند شماره نشست کاربری خود را دریافت و به شما اعلام کند.</i>", 
+                            null, "👇 شماره نشست کاربری این دانشجو را وارد نمایید یا اگر شماره نشست کاربری را نمی‌دانید، نام و نام خانوادگی دانشجو را به طور دقیق وارد کنید.:\n\n❔ <i>در صورتی که دانشجو شماره نشست کاربری خود را نمی داند، با ارسال دستور /getid به تنهایی به این بات، می تواند شماره نشست کاربری خود را دریافت و به شما اعلام کند.</i>", 
                             ParseMode.Html, null, false, false, 
                             true, msg.MessageId, false,
                             new ForceReplyMarkup()
@@ -447,7 +447,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         // Accept attendence!
                         var dateTimeNow = DateTime.Now;
                         var attendenceQuery = await Program.db.SQL_NewStudentAttendence(
-                            student_ChatID, lesson_PresentCode, dateTimeNow, teacher_ChatID
+                            student_ChatID, student.guid, lesson_PresentCode, dateTimeNow, teacher_ChatID
                             );
                         if (attendenceQuery.exception != null)
                             throw attendenceQuery.exception;
@@ -704,23 +704,45 @@ namespace ComputerTNB_ClassMgr_Bot
                                 bestPhoto = photo;
                         }
 
-                        // Register new user with raw values.
-                        var regQuery = await Program.db.SQL_RegisterStudentRaw(Convert.ToInt64(msg_Text));
-                        if (regQuery.exception != null)
-                            throw regQuery.exception;
-                        if (regQuery.result == null)
-                            throw new NullReferenceException();
-                        var regStudent = (Student)regQuery.result;
+                        // If input format is a LONG, then no student registeration is required.
+                        try
+                        {
+                            // Register new user with raw values.
+                            var regQuery = await Program.db.SQL_RegisterStudentRaw(Convert.ToInt64(msg_Text));
+                            if (regQuery.exception != null)
+                                throw regQuery.exception;
+                            if (regQuery.result == null)
+                                throw new NullReferenceException();
+                            var regStudent = (Student)regQuery.result;
 
-                        // Register face to both database and AI model!
-                        var registerQuery = await Program.db.SQL_RegisterFacePhoto(botClient, bestPhoto, regStudent.ai_ModelIndex);
-                        if (registerQuery.exception != null)
-                            throw registerQuery.exception;
+                            // Register face to both database and AI model!
+                            var registerQuery = await Program.db.SQL_RegisterFacePhoto(botClient, bestPhoto, regStudent.ai_ModelIndex);
+                            if (registerQuery.exception != null)
+                                throw registerQuery.exception;
 
-                        Logging.Log_Information($"Identified student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {regStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
+                            Logging.Log_Information($"Identified student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {regStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
 
-                        // Also, mark student as attended!
-                        
+                            // Also, mark student as attended!
+                        }
+                        catch (FormatException)
+                        {
+                            // Unknown student registeration (with no CHAT_ID) is required.
+                            var blindRegQuery = await Program.db.SQL_RegisterStudentRaw(msg_Text);
+                            if (blindRegQuery.exception != null)
+                                throw blindRegQuery.exception;
+                            if (blindRegQuery.result == null)
+                                throw new NullReferenceException();
+
+                            // Assign student result.
+                            var blindStudent = (Student)blindRegQuery.result;
+
+                            // Register new blind face to both database and AI model.
+                            var blindFaceRegQuery = await Program.db.SQL_RegisterFacePhoto(botClient, bestPhoto, blindStudent.ai_ModelIndex);
+                            if (blindFaceRegQuery.exception != null)
+                                throw blindFaceRegQuery.exception;
+
+                            Logging.Log_Information($"Identified BLIND student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {blindStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
+                        }
 
                         // Update teacher status. (-> BACK TO Checking lesson attendence.)
                         await Program.db.SQL_ExecuteWrite($"UPDATE teachers " +

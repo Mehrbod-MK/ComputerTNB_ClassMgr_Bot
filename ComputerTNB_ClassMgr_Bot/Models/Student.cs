@@ -13,7 +13,8 @@ namespace ComputerTNB_ClassMgr_Bot.Models
     {
         #region Student_Variables
 
-        public long chatID = 0;
+        public long? chatID = 0;
+        public string? guid = null;
         public string? phoneNumber = null;
         public string? email = null;
         public DateTime joinedDate = DateTime.MinValue;
