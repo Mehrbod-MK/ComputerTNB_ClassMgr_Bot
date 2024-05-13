@@ -722,7 +722,14 @@ namespace ComputerTNB_ClassMgr_Bot
 
                             Logging.Log_Information($"Identified student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {regStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
 
-                            // Also, mark student as attended!
+                            // TODO: Also, mark student as attended!
+
+                            // Notify teacher about comission.
+                            await botClient.SendTextMessageAsync(
+                                teacher.chatID,
+                                $"✅ دانشجو {regStudent.FullName} با شماره نشست کاربری {regStudent.chatID} شناسایی و حضور ایشان در کلاس درس با موفقیت ثبت شد.",
+                                null, ParseMode.Html, null, null, false, true, message.MessageId, false, null
+                                );
                         }
                         catch (FormatException)
                         {
@@ -742,6 +749,8 @@ namespace ComputerTNB_ClassMgr_Bot
                                 throw blindFaceRegQuery.exception;
 
                             Logging.Log_Information($"Identified BLIND student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {blindStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
+
+                            // TODO: Also, mark student as attended!
                         }
 
                         // Update teacher status. (-> BACK TO Checking lesson attendence.)

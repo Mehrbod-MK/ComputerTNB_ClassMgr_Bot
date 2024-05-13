@@ -29,6 +29,31 @@ namespace ComputerTNB_ClassMgr_Bot.Models
 
         #endregion
 
+        #region Student_Properties
+
+        /// <summary>
+        /// Gets the full name of this <see cref="Student"/> object.
+        /// </summary>
+        public string? FullName
+        {
+            get
+            {
+                if (firstName == null && lastName == null)
+                    return null;
+
+                else if (firstName == null)
+                    return lastName;
+
+                else if (lastName == null)
+                    return firstName;
+
+                else
+                    return $"{firstName} {lastName}";
+            }
+        }
+
+        #endregion
+
         #region Student_Implementations
 
         public DBMgr.User_Roles GetRole() 
