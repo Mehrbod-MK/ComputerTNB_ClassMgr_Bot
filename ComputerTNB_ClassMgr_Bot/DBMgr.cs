@@ -192,7 +192,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         student = new Student()
                         {
-                            chatID = (long)reader["ChatID"],
+                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
                             guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
