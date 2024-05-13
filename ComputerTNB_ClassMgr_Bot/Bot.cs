@@ -460,7 +460,7 @@ namespace ComputerTNB_ClassMgr_Bot
                         // Accept attendence!
                         var dateTimeNow = DateTime.Now;
                         var attendenceQuery = await Program.db.SQL_NewStudentAttendence(
-                            student_ChatID, student.guid, lesson_PresentCode, dateTimeNow, teacher_ChatID
+                            student_ChatID, student_GUID, lesson_PresentCode, dateTimeNow, teacher_ChatID
                             );
                         if (attendenceQuery.exception != null)
                             throw attendenceQuery.exception;
@@ -468,23 +468,26 @@ namespace ComputerTNB_ClassMgr_Bot
                             throw new NullReferenceException();
 
                         // Inform teacher
-                        if(student_ChatID != 0)
-                            await botClient.AnswerCallbackQueryAsync(
-                                cbQuery.Id,
-                                $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.chatID})\n" +
-                                $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
-                                $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
-                                $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
-                                $"با موفقیت تأیید گردید.", true
+                        await botClient.AnswerCallbackQueryAsync(cbQuery.Id);
+                        if (student_ChatID != 0)
+                            await botClient.SendTextMessageAsync(
+                                teacher_ChatID,
+                                $"👨‍🎓👩‍🎓 حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.chatID})\n" +
+                                $"👨‍🏫👩‍🏫 توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
+                                $"📚 در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
+                                $"📅 در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
+                                $"✅ با موفقیت تأیید گردید.",
+                                parseMode: ParseMode.Html, protectContent: true, allowSendingWithoutReply: true
                                 );
                         else
-                            await botClient.AnswerCallbackQueryAsync(
-                                cbQuery.Id,
-                                $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.guid})\n" +
-                                $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
-                                $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
-                                $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
-                                $"با موفقیت تأیید گردید.", true
+                            await botClient.SendTextMessageAsync(
+                                teacher_ChatID,
+                                $"👨‍🎓👩‍🎓 حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.guid})\n" +
+                                $"👨‍🏫👩‍🏫 توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
+                                $"📚 در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
+                                $"📅 در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
+                                $"✅ با موفقیت تأیید گردید.",
+                                parseMode: ParseMode.Html, protectContent: true, allowSendingWithoutReply: true
                                 );
 
                         // Delete message.
@@ -492,7 +495,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     }
                     catch(Exception ex)
                     {
-
+                        Console.WriteLine(ex.ToString());
                     }
                 }
             }
@@ -1246,7 +1249,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             Logging.Log_Information($"BLIND Student has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
 
                             inlineKeyboardButtons_FaceRecognition.Add(new()
-                                { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.FullName}~{teacher.__meta}") });
+                                { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.guid}~{teacher.__meta}") });
                         }
                     }
                     else
@@ -1263,7 +1266,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             Logging.Log_Information($"BLIND Student has attended Lesson \'{teacher.__meta}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
 
                             inlineKeyboardButtons_FaceRecognition.Add(new()
-                                { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.FullName}") });
+                                { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.guid}") });
                         }
                     }
 

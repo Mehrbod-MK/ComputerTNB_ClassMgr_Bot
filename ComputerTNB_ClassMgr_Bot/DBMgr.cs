@@ -594,7 +594,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             result = rowsAffected,
                         };
                     }
-                    catch(Exception)
+                    catch(Exception ex)
                     {
                         try
                         {
@@ -604,7 +604,7 @@ namespace ComputerTNB_ClassMgr_Bot
                             return new DBResult()
                             {
                                 success = false,
-                                exception = null,
+                                exception = ex,
                                 result = -1,
                             };
                         }
@@ -1381,12 +1381,13 @@ namespace ComputerTNB_ClassMgr_Bot
                         str_StudentGUID = $"\'{studentGUID}\'";
 
                     string commandText = "";
-                    if(studentChatID != null)
-                        commandText = "SELECT * FROM students_attens " +
-                            "WHERE Student_ChatID = @STUDENT_CHATID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
+                    string strDateAttended = Convert_FromDateTime_ToSQLDateString(dateAttended);
+                    if (studentChatID != null)
+                        commandText = "SELECT * FROM students_attends " +
+                            $"WHERE Student_ChatID = @STUDENT_CHATID AND Lesson_PresentationCode = '@LESSON_PRESENTCODE' AND Date_Attended = '{strDateAttended}';";
                     else if(studentGUID != null)
-                        commandText = "SELECT * FROM students_attens " +
-                            "WHERE Student_GUID = @STUDENT_GUID AND Lesson_PresentationCode = @LESSON_PRESENTCODE AND Date_Attended = \'@DATE_ATTENDED\';";
+                        commandText = "SELECT * FROM students_attends " +
+                            $"WHERE Student_GUID = '@STUDENT_GUID' AND Lesson_PresentationCode = '@LESSON_PRESENTCODE' AND Date_Attended = '{strDateAttended}';";
 
                     MySqlCommand command =
                         new MySqlCommand(commandText, connection);
@@ -1397,9 +1398,9 @@ namespace ComputerTNB_ClassMgr_Bot
                     else
                         throw new ArgumentNullException("Cannot locate attendence when Student's CHAT_ID nor GUID is provided...!");
 
-                    command.Parameters.AddWithValue("LESSON_PRESENTCODE", lesson_PresentationCode);
-                    command.Parameters.AddWithValue("DATE_ATTENDED", Convert_FromDateTime_ToSQLDateString(dateAttended));
                     command.ConfigureAwait(false);
+                    command.Parameters.AddWithValue("LESSON_PRESENTCODE", lesson_PresentationCode);
+                    // command.Parameters.AddWithValue("PARAM_DATE_ATTENDED", Convert_FromDateTime_ToSQLDateString(dateAttended));
 
                     var reader = command.ExecuteReader();
                     reader.ConfigureAwait(false);
@@ -1440,9 +1441,9 @@ namespace ComputerTNB_ClassMgr_Bot
             {
                 // Create parameters for query.
                 string str_StudentChatID = "NULL", str_StudentGUID = "NULL";
-                if (studentChatID != null)
+                if (studentChatID != null && studentChatID != 0)
                     str_StudentChatID = $"\'{studentChatID}\'";
-                else if (studentGUID != null)
+                else if (studentGUID != null && !string.IsNullOrEmpty(studentGUID) && !string.IsNullOrWhiteSpace(studentGUID))
                     str_StudentGUID = $"\'{studentGUID}\'";
 
                 // Check if an attendence already existed...
@@ -1464,6 +1465,9 @@ namespace ComputerTNB_ClassMgr_Bot
                     $"('{attendenceGuid}', {str_StudentChatID}, {str_StudentGUID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
                     );
 
+                //Console.WriteLine($"INSERT INTO students_attends VALUES" +
+                 //   $"('{attendenceGuid}', {str_StudentChatID}, '{str_StudentGUID}', \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});");
+
                 // If an exception occured, throw it.
                 if (studAttend_WriteQuery.exception != null)
                     throw studAttend_WriteQuery.exception;
@@ -1471,7 +1475,9 @@ namespace ComputerTNB_ClassMgr_Bot
                 // Create the Student_Attendence model and return it as the result.
                 Student_Attend studAttend = new()
                 {
+                    attendence_GUID = attendenceGuid,
                     student_ChatID = studentChatID,
+                    student_GUID = str_StudentGUID,
                     lesson_PresentationCode = lesson_PresentationCode,
                     date_Attended = dateAttended,
                     submittedBy_ChatID = submittedBy_ChatID,
