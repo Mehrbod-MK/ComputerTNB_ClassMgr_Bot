@@ -1456,10 +1456,12 @@ namespace ComputerTNB_ClassMgr_Bot
                 if (studAttend_Query.result != null)
                     return studAttend_Query;
 
+                var attendenceGuid = _GET_GUID();
+
                 // Otherwise, create the new attendence record.
                 var studAttend_WriteQuery = await SQL_ExecuteWrite(
                     $"INSERT INTO students_attends VALUES" +
-                    $"({str_StudentChatID}, {str_StudentGUID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
+                    $"('{attendenceGuid}', {str_StudentChatID}, {str_StudentGUID}, \'{lesson_PresentationCode}\', \'{Convert_FromDateTime_ToSQLDateString(dateAttended)}\', {submittedBy_ChatID});"
                     );
 
                 // If an exception occured, throw it.

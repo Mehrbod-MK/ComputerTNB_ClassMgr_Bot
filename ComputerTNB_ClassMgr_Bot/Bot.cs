@@ -402,7 +402,10 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     try
                     {
-                        long student_ChatID = Convert.ToInt64(datas[1]);
+                        long student_ChatID = 0;
+                        string student_GUID = string.Empty;
+                        try { student_ChatID = Convert.ToInt64(datas[1]); }
+                        catch(FormatException) { student_GUID = datas[1]; }
                         long teacher_ChatID = cbQuery.Message.Chat.Id;
                         string lesson_PresentCode = datas[2];
 
@@ -418,12 +421,22 @@ namespace ComputerTNB_ClassMgr_Bot
                             return;
                         }
 
-                        // Check student validity.
-                        var studentQuery = await Program.db.SQL_GetStudent(student_ChatID);
-                        if(studentQuery.result == null)
+                        // Check student validity (Both normal and BLIND).
+                        DBMgr.DBResult studentQuery = new();
+                        if (student_ChatID != 0)
+                            studentQuery = await Program.db.SQL_GetStudent(student_ChatID);
+                        else
+                            studentQuery = await Program.db.SQL_GetStudent(student_GUID);
+                        if (studentQuery.result == null)
                         {
-                            await botClient.AnswerCallbackQueryAsync(
+                            if(student_ChatID != 0)
+                                await botClient.AnswerCallbackQueryAsync(
                                 cbQuery.Id, $"❌ نشست کاربری دانشجو {student_ChatID} معتبر نمی‌باشد.",
+                                true
+                                );
+                            else
+                                await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id, $"❌ نشست کاربری دانشجو {student_GUID} معتبر نمی‌باشد.",
                                 true
                                 );
 
@@ -454,15 +467,25 @@ namespace ComputerTNB_ClassMgr_Bot
                         else if (attendenceQuery.result == null)
                             throw new NullReferenceException();
 
-                        // Inform teacher.
-                        await botClient.AnswerCallbackQueryAsync(
-                            cbQuery.Id,
-                            $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.chatID})\n" +
-                            $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
-                            $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
-                            $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
-                            $"با موفقیت تأیید گردید.", true
-                            );
+                        // Inform teacher
+                        if(student_ChatID != 0)
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id,
+                                $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.chatID})\n" +
+                                $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
+                                $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
+                                $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
+                                $"با موفقیت تأیید گردید.", true
+                                );
+                        else
+                            await botClient.AnswerCallbackQueryAsync(
+                                cbQuery.Id,
+                                $"حضور و غیاب دانشجو {student.firstName} {student.lastName} ({student.guid})\n" +
+                                $"توسط استاد {teacher.fullName} ({teacher.chatID})\n" +
+                                $"در درس {lesson.lessonName} با کد ارائه {lesson.presentationCode}\n" +
+                                $"در تاریخ {DBMgr.Convert_FromDateTime_ToPersianDateString(dateTimeNow)}\n" +
+                                $"با موفقیت تأیید گردید.", true
+                                );
 
                         // Delete message.
                         await botClient.DeleteMessageAsync(teacher.chatID, cbQuery.Message.MessageId);
@@ -1180,7 +1203,7 @@ namespace ComputerTNB_ClassMgr_Bot
                 {
                     Logging.Log_Information($"IDENTIFIED student with AI_ModelIndex:  \'{face.Value}\'. -> Student_ChatID=  \'{Convert.ToInt64(findStudent.chatID)}\'.");
 
-                    captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{Convert.ToInt64(findStudent.chatID)}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
+                    captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{findStudent.guid}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
 
                     DBMgr.DBResult? isStudentAlreadyAttended_Query = new();
                     // If student is not BLIND (Has an actual CHAT ID), refer using CHAT ID.
@@ -1191,11 +1214,11 @@ namespace ComputerTNB_ClassMgr_Bot
                         $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
                         $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
                     }
-                    // Otherwise, student is BLIND and should be searched by their FULL NAME.
+                    // Otherwise, student is BLIND and should be searched by their GUID.
                     else
                     {
                         isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM students_attends " +
-                        $"WHERE Student_FullName= \'{findStudent.FullName}\' and " +
+                        $"WHERE Student_GUID= \'{findStudent.guid}\' and " +
                         $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
                         $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
                     }
