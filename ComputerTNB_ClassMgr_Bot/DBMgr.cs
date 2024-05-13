@@ -192,7 +192,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         student = new Student()
                         {
-                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            chatID = ConvertFromDBVal<long?>(reader["ChatID"]),
                             guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
@@ -254,7 +254,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         student = new Student()
                         {
-                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            chatID = ConvertFromDBVal<long?>(reader["ChatID"]),
                             guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
@@ -319,7 +319,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         students.Add(new Student()
                         {
-                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            chatID = ConvertFromDBVal<long?>(reader["ChatID"]),
                             guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
@@ -377,7 +377,7 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         student = new Student()
                         {
-                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            chatID = ConvertFromDBVal<long?>(reader["ChatID"]),
                             guid = ConvertFromDBVal<string?>(reader["GUID"]),
                             email = ConvertFromDBVal<string?>(reader["Email"]),
                             firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
@@ -1409,8 +1409,8 @@ namespace ComputerTNB_ClassMgr_Bot
                     {
                         studentAttend = new()
                         {
-                            student_ChatID = ConvertFromDBVal<long>(reader["Student_ChatID"]),
-                            student_GUID = ConvertFromDBVal<string>(reader["Student_GUID"]),
+                            student_ChatID = ConvertFromDBVal<long?>(reader["Student_ChatID"]),
+                            student_GUID = ConvertFromDBVal<string?>(reader["Student_GUID"]),
                             lesson_PresentationCode = (string)reader["Lesson_PresentationCode"],
                             date_Attended = Convert_FromSQLDateString_ToDateTime((string)reader["Date_Attended"]),
                             submittedBy_ChatID = (long)reader["SubmittedBy_ChatID"],

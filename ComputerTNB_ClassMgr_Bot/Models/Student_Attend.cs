@@ -13,8 +13,10 @@ namespace ComputerTNB_ClassMgr_Bot.Models
     {
         #region StudentAttend_Vairbales
 
+        public string attendence_GUID = string.Empty;
         public long? student_ChatID = null;
         public string? student_GUID = null;
+        public string? student_FullName = null;
         public string lesson_PresentationCode = string.Empty;
         public DateTime date_Attended = DateTime.MinValue;
         public long submittedBy_ChatID = 0;

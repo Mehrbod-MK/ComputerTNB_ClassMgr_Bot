@@ -751,6 +751,13 @@ namespace ComputerTNB_ClassMgr_Bot
                             Logging.Log_Information($"Identified BLIND student picture with global FileId: \'{bestPhoto.FileUniqueId}\' and face model index: {blindStudent.ai_ModelIndex}.", $"Process_Message_Teacher_User({teacher.chatID}) -> IDENTIFY_STUD_PIC");
 
                             // TODO: Also, mark student as attended!
+
+                            // Notify teacher about comission.
+                            await botClient.SendTextMessageAsync(
+                                teacher.chatID,
+                                $"✅ دانشجو {blindStudent.FullName} شناسایی و حضور ایشان در کلاس درس با موفقیت ثبت شد.",
+                                null, ParseMode.Html, null, null, false, true, message.MessageId, false, null
+                                );
                         }
 
                         // Update teacher status. (-> BACK TO Checking lesson attendence.)
@@ -1171,34 +1178,70 @@ namespace ComputerTNB_ClassMgr_Bot
                 }
                 else
                 {
-                    Logging.Log_Information($"IDENTIFIED student with AI_ModelIndex:  \'{face.Value}\'. -> Student_ChatID=  \'{findStudent.chatID}\'.");
+                    Logging.Log_Information($"IDENTIFIED student with AI_ModelIndex:  \'{face.Value}\'. -> Student_ChatID=  \'{Convert.ToInt64(findStudent.chatID)}\'.");
 
-                    captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{findStudent.chatID}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
+                    captionText = $"🖼 دانشجو شناسایی شد: ✅\n\n<b>👈 نام و نام خانوادگی دانشجو: {findStudent.firstName} {findStudent.lastName}\n👈 شماره نشست کاربری اختصاصی:  <code>{Convert.ToInt64(findStudent.chatID)}</code></b>\n\n<i>با استفاده از دکمه های ذیل، اقدام به حضور و غیاب کنید.</i> 👇";
 
-                    var isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM students_attends " +
+                    DBMgr.DBResult? isStudentAlreadyAttended_Query = new();
+                    // If student is not BLIND (Has an actual CHAT ID), refer using CHAT ID.
+                    if(findStudent.chatID != null)
+                    {
+                        isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM students_attends " +
                         $"WHERE Student_ChatID= {findStudent.chatID} and " +
                         $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
                         $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
+                    }
+                    // Otherwise, student is BLIND and should be searched by their FULL NAME.
+                    else
+                    {
+                        isStudentAlreadyAttended_Query = await Program.db.SQL_ExecuteScalar<long>($"SELECT COUNT(*) FROM students_attends " +
+                        $"WHERE Student_FullName= \'{findStudent.FullName}\' and " +
+                        $"Lesson_PresentationCode= \'{teacher.__meta}\' and " +
+                        $"Date_Attended = \'{DBMgr.Convert_FromDateTime_ToSQLDateString(DateTime.Now)}\';");
+                    }
+
+                    if (isStudentAlreadyAttended_Query.exception != null)
+                        throw isStudentAlreadyAttended_Query.exception;
                     if (isStudentAlreadyAttended_Query.result == null)
                     {
-                        /*Console.WriteLine("\n\nNULLLLLLLLLLL\n\n");*/
                         throw new NullReferenceException();
                     }
+
                     bool isStudentAlreadyAttended = (long)isStudentAlreadyAttended_Query.result != 0;
 
                     if (!isStudentAlreadyAttended)
                     {
-                        Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+                        if(findStudent.chatID != null)
+                        {
+                            Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
 
-                        inlineKeyboardButtons_FaceRecognition.Add(new()
-                        { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}~{teacher.__meta}") });
+                            inlineKeyboardButtons_FaceRecognition.Add(new()
+                                { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.chatID}~{teacher.__meta}") });
+                        }
+                        else
+                        {
+                            Logging.Log_Information($"BLIND Student has not attended Lesson \'{teacher.__meta}\' yet.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
+                            inlineKeyboardButtons_FaceRecognition.Add(new()
+                                { InlineKeyboardButton.WithCallbackData("✅ تأیید حضور دانشجو", $"ACCEPT_STUD_ATTEND~{findStudent.FullName}~{teacher.__meta}") });
+                        }
                     }
                     else
                     {
-                        Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has attended Lesson \'{teacher.__meta}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+                        if (findStudent.chatID != null)
+                        {
+                            Logging.Log_Information($"Student with ChatID \'{findStudent.chatID}\' has attended Lesson \'{teacher.__meta}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
 
-                        inlineKeyboardButtons_FaceRecognition.Add(new()
-                        { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.chatID}") });
+                            inlineKeyboardButtons_FaceRecognition.Add(new()
+                                { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.chatID}") });
+                        }
+                        else
+                        {
+                            Logging.Log_Information($"BLIND Student has attended Lesson \'{teacher.__meta}\'.", $"Prompt_Teacher_FaceBubbles({teacher.chatID}");
+
+                            inlineKeyboardButtons_FaceRecognition.Add(new()
+                                { InlineKeyboardButton.WithCallbackData("🚫 لغو حضور دانشجو", $"DECLINE_STUD_ATTEND~{findStudent.FullName}") });
+                        }
                     }
 
                     inlineKeyboardButtons_FaceRecognition.Add(new()
