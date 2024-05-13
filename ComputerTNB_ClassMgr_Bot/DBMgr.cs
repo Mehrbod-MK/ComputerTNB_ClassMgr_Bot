@@ -286,6 +286,71 @@ namespace ComputerTNB_ClassMgr_Bot
                 { exception = ex, result = null, success = false };
             }
         }
+        /// <summary>
+        /// This method retrieves a Student object from students' table, providing its FIRSTNAME & LASTNAME.
+        /// </summary>
+        /// <param name="firstname">Student's first name.</param>
+        /// <param name="lastname">Student's last name.</param>
+        /// <param name="comparisonOperator">SQL Comparison operator, such as =, LIKE, etc.</param>
+        /// <returns>This task returns a <see cref="DBResult"/> structure., which its result contains <see cref="List{T}"/> of <see cref="Student"/> objects who have the same firstname and lastname.</returns>
+        public async Task<DBResult> SQL_GetStudent(string firstname, string lastname, string comparisonOperator = "=")
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionString))
+                {
+                    connection.ConfigureAwait(false);
+                    await connection.OpenAsync();
+
+                    string commandText = "SELECT * FROM students " +
+                        $"WHERE FirstName {comparisonOperator} @STUD_FIRST_NAME AND LastName {comparisonOperator} @STUD_LAST_NAME";
+
+                    MySqlCommand command =
+                        new MySqlCommand(commandText, connection);
+                    command.Parameters.AddWithValue("STUD_FIRST_NAME", $"'{firstname}'");
+                    command.Parameters.AddWithValue("STUD_LAST_NAME", $"'{lastname}'");
+                    command.ConfigureAwait(false);
+
+                    var reader = command.ExecuteReader();
+                    reader.ConfigureAwait(false);
+
+                    List<Student> students = new();
+                    while (await reader.ReadAsync())
+                    {
+                        students.Add(new Student()
+                        {
+                            chatID = ConvertFromDBVal<long>(reader["ChatID"]),
+                            guid = ConvertFromDBVal<string?>(reader["GUID"]),
+                            email = ConvertFromDBVal<string?>(reader["Email"]),
+                            firstName = ConvertFromDBVal<string?>(reader["FirstName"]),
+                            lastName = ConvertFromDBVal<string?>(reader["LastName"]),
+                            joinedDate = (DateTime)reader["JoinDate"],
+                            lastActivity = (DateTime)reader["LastActivity"],
+                            phoneNumber = ConvertFromDBVal<string?>(reader["PhoneNumber"]),
+                            studentId = ConvertFromDBVal<string?>(reader["StudentID"]),
+
+                            state = (uint)reader["State"],
+
+                            ai_ModelIndex = (int)reader["AI_ModelIndex"],
+                        });
+                    }
+
+                    await reader.CloseAsync();
+                    await command.DisposeAsync();
+
+                    return new DBResult()
+                    {
+                        success = true,
+                        result = students,
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                return new DBResult()
+                { exception = ex, result = null, success = false };
+            }
+        }
 
         public async Task<DBResult> SQL_GetStudent_ByAIModelIndex(int ai_ModelIndex)
         {
@@ -1189,6 +1254,24 @@ namespace ComputerTNB_ClassMgr_Bot
                     firstName = $"\'{names[0]}\'";
                 if (names.Length >= 2)
                     lastName = $"\'{names[1]}\'";
+
+                // Check if a previous student (or students) existed.
+                var prevStudent_Query = await SQL_GetStudent(firstName, lastName);
+                if (prevStudent_Query.exception != null)
+                    throw prevStudent_Query.exception;
+                else if (prevStudent_Query.result == null)
+                    throw new NullReferenceException();
+                var studentsList = (List<Student>)prevStudent_Query.result;
+                if(studentsList.Count > 0)
+                {
+                    // Set the FIRST matching student as previous query result.
+                    return new DBResult
+                    {
+                        exception = null,
+                        success = true,
+                        result = studentsList[0],
+                    };
+                }
 
                 string queryText = $"INSERT INTO students(GUID, FirstName, LastName, JoinDate, LastActivity) VALUES (" +
                     $"\'{guid}\', {firstName}, {lastName}, " +
