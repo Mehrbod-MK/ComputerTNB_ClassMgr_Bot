@@ -192,7 +192,8 @@ namespace ComputerTNB_ClassMgr_Bot
                 long chatID = cbQuery.Message.Chat.Id;
 
                 // Process CBQUERY_MACRO Messages.
-                if (cbQuery.Data == "CLOSE_LESSON_PANEL")
+                if (cbQuery.Data == "CLOSE_LESSON_PANEL" ||
+                    cbQuery.Data == "CLOSE_ATTENDEE_PANEL")
                 {
                     await botClient.AnswerCallbackQueryAsync(cbQuery.Id,
                         "پنجره بسته شد ✅", false);
